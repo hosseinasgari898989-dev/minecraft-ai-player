@@ -22,6 +22,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
@@ -289,14 +290,23 @@ public class AiPlayerMod implements ModInitializer {
                                 decision.tasks()
                         );
 
-                        if (decision.plan() != null) {
+                        List<RobotCommandPlanner.Plan> agentPlans = decision.actions().stream()
+                                .map(action -> AgentSkillRegistry.resolve(action.skill()))
+                                .flatMap(Optional::stream)
+                                .filter(plan -> aiConfig.isActionEnabled(plan.mode().name()))
+                                .toList();
+
+                        if (!agentPlans.isEmpty()) {
+                            commandRobot.enqueueAgentPlans(agentPlans);
+                            AgentMemoryStore.markLatestTaskRunning(memoryState);
+                        } else if (decision.plan() != null) {
                             commandRobot.applyPlan(decision.plan());
                             AgentMemoryStore.markLatestTaskRunning(memoryState);
                         }
 
                         AgentMemoryStore.save(player.getUuid(), memoryState);
 
-                        if (decision.plan() == null && !decision.tasks().isEmpty()) {
+                        if (agentPlans.isEmpty() && decision.plan() == null && !decision.tasks().isEmpty()) {
                             AiIntentClient.TaskSuggestion task = decision.tasks().get(0);
                             player.sendMessage(
                                     Text.literal("🧠 تسک ثبت شد: " + task.title()),
@@ -363,7 +373,8 @@ public class AiPlayerMod implements ModInitializer {
                 + "; commands=" + robot.getCommandsExecuted()
                 + "; blocksBroken=" + robot.getBlocksBroken()
                 + "; blocksPlaced=" + robot.getBlocksPlaced()
-                + "; attacks=" + robot.getAttacksMade();
+                + "; attacks=" + robot.getAttacksMade()
+                + "; queuedActions=" + robot.getQueuedPlanCount();
     }
 
     private static String extractBotInstruction(ServerPlayerEntity player, String rawMessage) {
