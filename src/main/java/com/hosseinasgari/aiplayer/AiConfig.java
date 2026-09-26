@@ -140,12 +140,20 @@ public final class AiConfig {
     }
 
     public boolean isConfigured() {
-        return enabled
-                && !apiKey.isBlank()
-                && !baseUrl.isBlank()
-                && !model.isBlank()
-                && !baseUrl.contains("your-provider.example")
-                && !model.equalsIgnoreCase("your-model");
+        if (!enabled
+                || baseUrl.isBlank()
+                || model.isBlank()
+                || baseUrl.contains("your-provider.example")
+                || model.equalsIgnoreCase("your-model")) {
+            return false;
+        }
+
+        // Local llama.cpp/Ollama-style servers do not need an API key.
+        boolean local = baseUrl.startsWith("http://127.0.0.1:")
+                || baseUrl.startsWith("http://localhost:")
+                || baseUrl.startsWith("http://0.0.0.0:");
+
+        return local || !apiKey.isBlank();
     }
 
     public String baseUrl() {
