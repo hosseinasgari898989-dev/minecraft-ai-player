@@ -28,8 +28,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
@@ -535,10 +533,11 @@ public class AiPlayerMod implements ModInitializer {
 
     private static AiPlayerEntity findOwnedRobot(ServerPlayerEntity player) {
         return player.getServerWorld()
-                .getEntitiesByClass(
-                        AiPlayerEntity.class,
-                        player.getBoundingBox().expand(64.0),
-                        entity -> player.getUuid().equals(entity.getOwnerUuid()) && entity.isAlive()
+                .getEntitiesByType(
+                        ModEntities.AI_PLAYER,
+                        entity -> player.getUuid().equals(entity.getOwnerUuid())
+                                && entity.isAlive()
+                                && !entity.isRemoved()
                 )
                 .stream()
                 .min((a, b) -> Double.compare(player.squaredDistanceTo(a), player.squaredDistanceTo(b)))
