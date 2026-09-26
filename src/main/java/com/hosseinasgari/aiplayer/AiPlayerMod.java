@@ -21,9 +21,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +42,6 @@ public class AiPlayerMod implements ModInitializer {
     private static AiConfig aiConfig;
     private static AiIntentClient aiClient;
     private static final Set<UUID> AI_REQUESTS_IN_FLIGHT = ConcurrentHashMap.newKeySet();
-    private static final Map<UUID, List<AiIntentClient.ChatTurn>> CHAT_MEMORY = new ConcurrentHashMap<>();
     private static long companionCheckTicker;
 
     @Override
@@ -60,7 +56,6 @@ public class AiPlayerMod implements ModInitializer {
         );
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             removeOwnedRobots(server, handler.getPlayer().getUuid());
-            CHAT_MEMORY.remove(handler.getPlayer().getUuid());
             AI_REQUESTS_IN_FLIGHT.remove(handler.getPlayer().getUuid());
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -225,13 +220,16 @@ public class AiPlayerMod implements ModInitializer {
         }
 
         String context = buildRobotContext(robot);
-        List<AiIntentClient.ChatTurn> memory =
-                new ArrayList<>(CHAT_MEMORY.getOrDefault(player.getUuid(), List.of()));
+        AgentMemoryStore.State memoryState = AgentMemoryStore.load(player.getUuid());
+        String memoryContext = AgentMemoryStore.buildModelContext(
+                memoryState,
+                aiConfig.memoryMessages()
+        );
 
         Thread.ofVirtual().start(() -> {
             try {
                 Optional<AiIntentClient.Decision> result =
-                        aiClient.chat(instruction, context, memory);
+                        aiClient.chat(instruction, context, memoryContext);
 
                 player.getServer().execute(() -> {
                     try {
@@ -250,11 +248,42 @@ public class AiPlayerMod implements ModInitializer {
                             );
                         }
 
-                        if (decision.plan() != null) {
-                            commandRobot.applyPlan(decision.plan());
+                        AgentMemoryStore.addChat(
+                                memoryState,
+                                "user",
+                                instruction,
+                                aiConfig.memoryMessages()
+                        );
+                        if (!reply.isBlank()) {
+                            AgentMemoryStore.addChat(
+                                    memoryState,
+                                    "assistant",
+                                    reply,
+                                    aiConfig.memoryMessages()
+                            );
                         }
 
-                        rememberChat(player.getUuid(), instruction, reply);
+                        AgentMemoryStore.mergeAiOutput(
+                                memoryState,
+                                decision.memories(),
+                                decision.commands(),
+                                decision.tasks()
+                        );
+
+                        if (decision.plan() != null) {
+                            commandRobot.applyPlan(decision.plan());
+                            AgentMemoryStore.markLatestTaskRunning(memoryState);
+                        }
+
+                        AgentMemoryStore.save(player.getUuid(), memoryState);
+
+                        if (decision.plan() == null && !decision.tasks().isEmpty()) {
+                            AiIntentClient.TaskSuggestion task = decision.tasks().get(0);
+                            player.sendMessage(
+                                    Text.literal("🧠 تسک ثبت شد: " + task.title()),
+                                    false
+                            );
+                        }
                     } finally {
                         AI_REQUESTS_IN_FLIGHT.remove(player.getUuid());
                     }
@@ -263,18 +292,36 @@ public class AiPlayerMod implements ModInitializer {
                 player.getServer().execute(() -> {
                     try {
                         RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
+                        String fallbackReply;
+
                         if (fallback != null && aiConfig.isActionEnabled(fallback.mode().name())) {
                             commandRobot.applyPlan(fallback);
+                            fallbackReply = "ارتباط با AI مشکل داشت؛ فرمان شناخته‌شده را مستقیم اجرا کردم.";
                             player.sendMessage(
-                                    Text.literal("§dAI Player§f: ارتباط با AI مشکل داشت؛ فرمان مستقیم را اجرا کردم."),
+                                    Text.literal("§dAI Player§f: " + fallbackReply),
                                     false
                             );
                         } else {
+                            fallbackReply = "ارتباط با AI برقرار نشد؛ پیام را نگه داشتم تا بعداً بتوانیم ادامه بدهیم.";
                             player.sendMessage(
-                                    Text.literal("§dAI Player§f: ارتباط با AI برقرار نشد."),
+                                    Text.literal("§dAI Player§f: " + fallbackReply),
                                     false
                             );
                         }
+
+                        AgentMemoryStore.addChat(
+                                memoryState,
+                                "user",
+                                instruction,
+                                aiConfig.memoryMessages()
+                        );
+                        AgentMemoryStore.addChat(
+                                memoryState,
+                                "assistant",
+                                fallbackReply,
+                                aiConfig.memoryMessages()
+                        );
+                        AgentMemoryStore.save(player.getUuid(), memoryState);
                     } finally {
                         AI_REQUESTS_IN_FLIGHT.remove(player.getUuid());
                     }
@@ -298,21 +345,6 @@ public class AiPlayerMod implements ModInitializer {
                 + "; blocksBroken=" + robot.getBlocksBroken()
                 + "; blocksPlaced=" + robot.getBlocksPlaced()
                 + "; attacks=" + robot.getAttacksMade();
-    }
-
-    private static void rememberChat(UUID playerUuid, String userMessage, String assistantMessage) {
-        List<AiIntentClient.ChatTurn> history =
-                CHAT_MEMORY.computeIfAbsent(playerUuid, key -> new ArrayList<>());
-
-        history.add(new AiIntentClient.ChatTurn("user", userMessage));
-        if (assistantMessage != null && !assistantMessage.isBlank()) {
-            history.add(new AiIntentClient.ChatTurn("assistant", assistantMessage));
-        }
-
-        int maxEntries = Math.max(2, aiConfig.memoryMessages() * 2);
-        while (history.size() > maxEntries) {
-            history.remove(0);
-        }
     }
 
     private static String extractBotInstruction(ServerPlayerEntity player, String rawMessage) {
