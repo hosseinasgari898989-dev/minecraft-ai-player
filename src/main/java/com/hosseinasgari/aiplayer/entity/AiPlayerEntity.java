@@ -387,7 +387,8 @@ public class AiPlayerEntity extends PathAwareEntity {
         if (ownerUuid == null || !(this.getWorld() instanceof ServerWorld serverWorld)) {
             return null;
         }
-        return serverWorld.getPlayerByUuid(ownerUuid);
+        net.minecraft.entity.player.PlayerEntity player = serverWorld.getPlayerByUuid(ownerUuid);
+        return player instanceof ServerPlayerEntity serverPlayer ? serverPlayer : null;
     }
 
     public void setOwner(ServerPlayerEntity owner) {
