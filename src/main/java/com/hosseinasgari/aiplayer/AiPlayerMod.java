@@ -106,31 +106,25 @@ public class AiPlayerMod implements ModInitializer {
                                                     return 0;
                                                 }
 
-                                                var world = player.getServerWorld();
-                                                var entity = ModEntities.AI_PLAYER.create(world);
+                                                ensureTemporaryCompanion(player);
+                                                var entity = findOwnedRobot(player);
                                                 if (entity == null) {
                                                     context.getSource().sendError(
-                                                            Text.literal("Could not create the AI Player.")
+                                                            Text.literal("Could not create or find the AI Player.")
                                                     );
                                                     return 0;
                                                 }
 
-                                                entity.refreshPositionAndAngles(
+                                                entity.requestTeleport(
                                                         player.getX() + 2.0,
                                                         player.getY(),
-                                                        player.getZ() + 2.0,
-                                                        player.getYaw(),
-                                                        0.0f
+                                                        player.getZ() + 2.0
                                                 );
-                                                entity.setCustomName(Text.literal("AI Player"));
-                                                entity.setCustomNameVisible(true);
-                                                entity.setPersistent();
-                                                entity.setOwner(player);
-                                                world.spawnEntity(entity);
+                                                entity.getNavigation().stop();
 
                                                 context.getSource().sendFeedback(
                                                         () -> Text.literal(
-                                                                "AI Player spawned and linked to you. Try /aiplayer command follow me"
+                                                                "AI Player is with you. برای کنترلش کافی است در چت طبیعی صحبت کنی."
                                                         ),
                                                         false
                                                 );
