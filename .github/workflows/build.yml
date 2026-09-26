@@ -37,6 +37,8 @@ jobs:
 
       - name: Publish latest JAR into repository
         run: |
+          git fetch origin main
+          git reset --hard origin/main
           mkdir -p latest
           cp build/libs/ai-player-*.jar latest/ai-player.jar
           git config user.name "github-actions[bot]"
@@ -44,7 +46,7 @@ jobs:
           git add latest/ai-player.jar
           git diff --cached --quiet && exit 0
           git commit -m "chore: publish latest AI Player JAR"
-          git push
+          git push origin HEAD:main
 
       - name: Upload mod JAR
         uses: actions/upload-artifact@v4
