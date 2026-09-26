@@ -21,6 +21,8 @@ public final class AiIntentClient {
 
     public record LearnedCommandSuggestion(String phrase, String intent) {}
 
+    public record ActionSuggestion(String skill) {}
+
     public record TaskSuggestion(
             String title,
             String details,
@@ -33,7 +35,8 @@ public final class AiIntentClient {
             RobotCommandPlanner.Plan plan,
             List<MemorySuggestion> memories,
             List<LearnedCommandSuggestion> commands,
-            List<TaskSuggestion> tasks
+            List<TaskSuggestion> tasks,
+            List<ActionSuggestion> actions
     ) {}
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -119,6 +122,7 @@ public final class AiIntentClient {
         List<MemorySuggestion> memories = new ArrayList<>();
         List<LearnedCommandSuggestion> commands = new ArrayList<>();
         List<TaskSuggestion> tasks = new ArrayList<>();
+        List<ActionSuggestion> actions = new ArrayList<>();
         RobotCommandPlanner.Plan plan = null;
 
         try {
@@ -138,6 +142,7 @@ public final class AiIntentClient {
                 }
             }
 
+            parseActions(json.getAsJsonArray("actions"), actions);
             parseMemories(json.getAsJsonArray("memories"), memories);
             parseCommands(json.getAsJsonArray("learned_commands"), commands);
             parseTasks(json.getAsJsonArray("tasks"), tasks);
@@ -150,7 +155,8 @@ public final class AiIntentClient {
                 plan,
                 memories,
                 commands,
-                tasks
+                tasks,
+                actions
         ));
     }
 
@@ -163,19 +169,18 @@ public final class AiIntentClient {
     }
 
     private static String buildSystemPrompt() {
-        return "You are the conversational brain of a Minecraft companion.\n"
-                + "Speak naturally in the player's language. Persian and English are supported.\n"
-                + "Do not behave like a rigid command list. Understand the player's intent, casual phrasing, context, and multi-step requests.\n"
-                + "Keep persistent memory useful: store durable facts, preferences, named places, important agreements, and learned command phrases.\n"
-                + "Turn meaningful multi-step requests into a small task plan. A task is a plan description, not executable Java code.\n"
-                + "Use the existing legacy action only when one of these actions is clearly appropriate: "
-                + "IDLE, FOLLOW, WANDER, EXPLORE, GUARD, PROTECT, PATROL, RETURN_HOME, "
-                + "GATHER_WOOD, GATHER_STONE, GATHER_COAL, BUILD_HOUSE, BUILD_TOWER.\n"
-                + "For anything more complex, keep the natural-language reply and store the task plan instead of claiming that it is executed.\n"
-                + "Only store information that is likely to remain useful later. Do not store secrets, API keys, passwords, or private credentials.\n"
-                + "Output ONLY valid JSON with fields reply, action, memories, learned_commands, and tasks.\n"
-                + "memories items use type and content. learned_commands items use phrase and intent. tasks items use title, details, steps, and priority.\n"
-                + "Use empty arrays when there is nothing durable to remember or plan.";
+        return "You are the Minecraft companion's REAL-TIME BRAIN. The entity is your body and your skill engine is your hands.\n"
+                + "Understand natural Persian or English, casual language, context, and multi-step goals.\n"
+                + "When the player asks you to do something in Minecraft, choose executable skills instead of merely describing them.\n"
+                + "Executable skills are: stop, follow_player, wander, explore, guard_home, protect_player, patrol_home, go_home, gather_wood, gather_stone, gather_coal, build_house, build_tower.\n"
+                + "Use actions as an ordered list of skills. Put the most important first. You may return up to 8 actions for a multi-step goal.\n"
+                + "Do NOT invent skill names. If the request is only conversation, actions must be an empty array.\n"
+                + "For a request like 'go home then build a house', return go_home then build_house.\n"
+                + "For a request like 'gather wood then build a house', return gather_wood then build_house.\n"
+                + "Keep durable memories useful: facts, preferences, named places, agreements, and learned phrases. Never store secrets.\n"
+                + "Output ONLY valid JSON with fields reply, actions, memories, learned_commands, and tasks.\n"
+                + "actions items use {skill}. memories use {type,content}. learned_commands use {phrase,intent}. tasks use {title,details,steps,priority}.\n"
+                + "Do not claim a task was completed unless the action engine can execute it.";
     }
 
     private static String extractAssistantContent(String responseBody) {
@@ -194,6 +199,18 @@ public final class AiIntentClient {
         }
 
         return message.get("content").getAsString().trim();
+    }
+
+    private static void parseActions(JsonArray values, List<ActionSuggestion> output) {
+        if (values == null) return;
+        for (JsonElement value : values) {
+            if (!value.isJsonObject()) continue;
+            JsonObject object = value.getAsJsonObject();
+            String skill = stringValue(object, "skill");
+            if (skill.isBlank()) continue;
+            output.add(new ActionSuggestion(skill));
+            if (output.size() >= 8) break;
+        }
     }
 
     private static void parseMemories(JsonArray values, List<MemorySuggestion> output) {
