@@ -21,8 +21,8 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static net.minecraft.command.argument.StringArgumentType.getString;
-import static net.minecraft.command.argument.StringArgumentType.greedyString;
+import static com.mojang.brigadier.arguments.StringArgumentType.getString;
+import static com.mojang.brigadier.arguments.StringArgumentType.greedyString;
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
