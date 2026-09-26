@@ -61,6 +61,25 @@ public final class AiIntentClient {
         return config.model();
     }
 
+    public int ping() throws Exception {
+        AiConfig current = config;
+        String endpoint = current.baseUrl().replaceAll("/+$", "") + "/models";
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(endpoint))
+                .timeout(Duration.ofSeconds(Math.min(15, current.timeoutSeconds())))
+                .header("Accept", "application/json")
+                .GET();
+
+        if (!current.apiKey().isBlank() && !current.apiKey().equalsIgnoreCase("local")) {
+            builder.header("Authorization", "Bearer " + current.apiKey());
+        }
+
+        return httpClient.send(
+                builder.build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+        ).statusCode();
+    }
+
     public Optional<Decision> chat(
             String instruction,
             String context,
