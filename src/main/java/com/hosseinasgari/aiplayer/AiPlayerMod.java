@@ -5,6 +5,7 @@ import com.hosseinasgari.aiplayer.entity.ModEntities;
 import com.hosseinasgari.aiplayer.entity.RobotCommandPlanner;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
@@ -19,6 +20,9 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
@@ -28,13 +32,25 @@ import static net.minecraft.server.command.CommandManager.literal;
 
 public class AiPlayerMod implements ModInitializer {
     public static final String MOD_ID = "ai_player";
+
     private static final URI LATEST_JAR = URI.create(
             "https://raw.githubusercontent.com/hosseinasgari898989-dev/minecraft-ai-player/main/latest/ai-player.jar"
     );
 
+    private static AiConfig aiConfig;
+    private static AiIntentClient aiClient;
+    private static final Set<UUID> AI_REQUESTS_IN_FLIGHT = ConcurrentHashMap.newKeySet();
+
     @Override
     public void onInitialize() {
         ModEntities.registerAttributes();
+
+        aiConfig = AiConfig.load();
+        aiClient = new AiIntentClient(aiConfig);
+
+        ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) ->
+                handleNaturalLanguageChat(sender, message.getContent().getString())
+        );
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(
@@ -124,6 +140,14 @@ public class AiPlayerMod implements ModInitializer {
                                             ))
                             )
                             .then(
+                                    literal("aistatus")
+                                            .executes(context -> showAiStatus(context.getSource()))
+                            )
+                            .then(
+                                    literal("aireload")
+                                            .executes(context -> reloadAiConfig(context.getSource()))
+                            )
+                            .then(
                                     literal("sethome")
                                             .executes(context -> {
                                                 var player = context.getSource().getPlayerOrThrow();
@@ -198,6 +222,121 @@ public class AiPlayerMod implements ModInitializer {
         });
     }
 
+    private static void handleNaturalLanguageChat(ServerPlayerEntity player, String rawMessage) {
+        String instruction = extractBotInstruction(rawMessage);
+        if (instruction == null || instruction.isBlank()) {
+            return;
+        }
+
+        if (findOwnedRobot(player) == null) {
+            player.sendMessage(Text.literal("🤖 اول رباتت را با /aiplayer spawn ظاهر کن."), false);
+            return;
+        }
+
+        if (!aiClient.isConfigured()) {
+            RobotCommandPlanner.Plan localPlan = RobotCommandPlanner.plan(instruction);
+            if (localPlan == null) {
+                player.sendMessage(
+                        Text.literal("🤖 هوش مصنوعی هنوز تنظیم نشده؛ فایل config/ai-player.properties را تنظیم کن."),
+                        false
+                );
+                return;
+            }
+
+            findOwnedRobot(player).applyPlan(localPlan);
+            player.sendMessage(Text.literal("🤖 " + localPlan.description()), false);
+            return;
+        }
+
+        if (!AI_REQUESTS_IN_FLIGHT.add(player.getUuid())) {
+            player.sendMessage(Text.literal("🤖 هنوز دارم فرمان قبلی را تحلیل می‌کنم..."), false);
+            return;
+        }
+
+        player.sendMessage(Text.literal("🤖 دارم فرمانت را بررسی می‌کنم..."), false);
+
+        Thread.ofVirtual().start(() -> {
+            try {
+                Optional<RobotCommandPlanner.Plan> result = aiClient.classify(instruction);
+
+                player.getServer().execute(() -> {
+                    try {
+                        if (result.isEmpty()) {
+                            RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
+                            if (fallback != null) {
+                                applyPlanFromAi(player, fallback);
+                            } else {
+                                player.sendMessage(Text.literal("🤖 این کار را هنوز بلد نیستم."), false);
+                            }
+                            return;
+                        }
+
+                        applyPlanFromAi(player, result.get());
+                    } finally {
+                        AI_REQUESTS_IN_FLIGHT.remove(player.getUuid());
+                    }
+                });
+            } catch (Exception error) {
+                player.getServer().execute(() -> {
+                    try {
+                        RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
+                        if (fallback != null) {
+                            applyPlanFromAi(player, fallback);
+                            player.sendMessage(
+                                    Text.literal("🤖 اتصال AI خطا داد؛ از فرمان داخلی استفاده کردم."),
+                                    false
+                            );
+                        } else {
+                            player.sendMessage(
+                                    Text.literal("🤖 اتصال به AI ناموفق بود. تنظیمات API را بررسی کن."),
+                                    false
+                            );
+                        }
+                    } finally {
+                        AI_REQUESTS_IN_FLIGHT.remove(player.getUuid());
+                    }
+                });
+            }
+        });
+    }
+
+    private static String extractBotInstruction(String rawMessage) {
+        if (rawMessage == null) {
+            return null;
+        }
+
+        String input = rawMessage.trim();
+        String[] prefixes = {
+                aiConfig.triggerPrefix() + " ",
+                aiConfig.triggerPrefix() + ":",
+                "@" + aiConfig.triggerPrefix() + " ",
+                "@" + aiConfig.triggerPrefix() + ":",
+                "bot ",
+                "bot:",
+                "@bot ",
+                "@bot:"
+        };
+
+        for (String prefix : prefixes) {
+            if (input.regionMatches(true, 0, prefix, 0, prefix.length())) {
+                return input.substring(prefix.length()).trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static void applyPlanFromAi(ServerPlayerEntity player, RobotCommandPlanner.Plan plan) {
+        AiPlayerEntity robot = findOwnedRobot(player);
+        if (robot == null) {
+            player.sendMessage(Text.literal("🤖 رباتت دیگر در محدوده نیست."), false);
+            return;
+        }
+
+        robot.applyPlan(plan);
+        player.sendMessage(Text.literal("🤖 انجام می‌دم: " + plan.description()), false);
+    }
+
     private static int applyInstruction(
             ServerPlayerEntity player,
             String instruction,
@@ -240,14 +379,50 @@ public class AiPlayerMod implements ModInitializer {
         source.sendFeedback(() -> Text.literal("§e/aiplayer sethome §f- ذخیره محل فعلی به‌عنوان خانه ربات"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer stop §f- توقف کامل کار فعلی"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer status §f- نمایش وضعیت، سلامت و آمار ربات"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer command <دستور> §f- دستور طبیعی فارسی یا انگلیسی"), false);
-        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command چوب جمع کن"), false);
-        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command خونه بساز"), false);
-        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command برگرد خونه"), false);
-        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command برج بساز"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer aistatus §f- وضعیت اتصال هوش مصنوعی"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer aireload §f- بارگذاری دوباره تنظیمات AI"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer command <دستور> §f- دستور مستقیم طبیعی فارسی یا انگلیسی"), false);
+        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات برو چوب جمع کن"), false);
+        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات خونه بساز"), false);
+        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات دنبالم بیا"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer hello §f- تست نصب مود"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer update §f- دریافت آخرین نسخه از GitHub"), false);
         source.sendFeedback(() -> Text.literal("§6================================"), false);
+        return 1;
+    }
+
+    private static int showAiStatus(net.minecraft.server.command.ServerCommandSource source) {
+        source.sendFeedback(() -> Text.literal("§6===== وضعیت AI ====="), false);
+        source.sendFeedback(
+                () -> Text.literal("§fفعال: §e" + aiConfig.isEnabled()),
+                false
+        );
+        source.sendFeedback(
+                () -> Text.literal("§fتنظیم شده: §e" + aiClient.isConfigured()),
+                false
+        );
+        source.sendFeedback(
+                () -> Text.literal("§fمدل: §e" + aiClient.model()),
+                false
+        );
+        source.sendFeedback(
+                () -> Text.literal("§fفایل تنظیمات: §e" + AiConfig.getConfigPath()),
+                false
+        );
+        source.sendFeedback(() -> Text.literal("§6===================="), false);
+        return 1;
+    }
+
+    private static int reloadAiConfig(net.minecraft.server.command.ServerCommandSource source) {
+        aiConfig = AiConfig.load();
+        aiClient.reload(aiConfig);
+
+        source.sendFeedback(
+                () -> Text.literal(
+                        "تنظیمات AI دوباره بارگذاری شد. آماده: " + aiClient.isConfigured()
+                ),
+                false
+        );
         return 1;
     }
 
