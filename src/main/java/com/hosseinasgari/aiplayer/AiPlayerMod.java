@@ -587,14 +587,38 @@ public class AiPlayerMod implements ModInitializer {
             return;
         }
 
+        AiPlayerEntity keeper = null;
+
         if (aiConfig.singleCompanion() && server.isSingleplayer()) {
             for (var world : server.getWorlds()) {
                 for (AiPlayerEntity robot : world.getEntitiesByType(ModEntities.AI_PLAYER, entity -> true)) {
-                    robot.discard();
+                    if (world == player.getServerWorld()
+                            && keeper == null
+                            && player.getUuid().equals(robot.getOwnerUuid())) {
+                        keeper = robot;
+                    } else {
+                        robot.discard();
+                    }
                 }
             }
         } else {
-            removeOwnedRobots(server, player.getUuid(), player.getServerWorld());
+            for (var world : server.getWorlds()) {
+                for (AiPlayerEntity robot : world.getEntitiesByType(
+                        ModEntities.AI_PLAYER,
+                        entity -> player.getUuid().equals(entity.getOwnerUuid())
+                )) {
+                    if (world == player.getServerWorld() && keeper == null) {
+                        keeper = robot;
+                    } else {
+                        robot.discard();
+                    }
+                }
+            }
+        }
+
+        if (keeper != null && keeper.isAlive()) {
+            keeper.setOwner(player);
+            return;
         }
 
         AiPlayerEntity entity = ModEntities.AI_PLAYER.create(player.getServerWorld());
@@ -615,7 +639,10 @@ public class AiPlayerMod implements ModInitializer {
         player.getServerWorld().spawnEntity(entity);
     }
 
-    private static void removeOwnedRobots(net.minecraft.server.MinecraftServer server, UUID ownerUuid) {
+    private static void removeOwnedRobots(
+            net.minecraft.server.MinecraftServer server,
+            UUID ownerUuid
+    ) {
         for (var world : server.getWorlds()) {
             for (AiPlayerEntity robot : world.getEntitiesByType(
                     ModEntities.AI_PLAYER,
@@ -623,31 +650,6 @@ public class AiPlayerMod implements ModInitializer {
             )) {
                 robot.discard();
             }
-        }
-    }
-
-    private static void removeOwnedRobots(
-            net.minecraft.server.MinecraftServer server,
-            UUID ownerUuid,
-            net.minecraft.server.world.ServerWorld keepWorld
-    ) {
-        AiPlayerEntity keeper = null;
-
-        for (var world : server.getWorlds()) {
-            for (AiPlayerEntity robot : world.getEntitiesByType(
-                    ModEntities.AI_PLAYER,
-                    entity -> ownerUuid.equals(entity.getOwnerUuid())
-            )) {
-                if (world == keepWorld && keeper == null) {
-                    keeper = robot;
-                } else {
-                    robot.discard();
-                }
-            }
-        }
-
-        if (keeper == null && keepWorld.getPlayers().contains(server.getPlayerManager().getPlayer(ownerUuid))) {
-            // The caller will spawn a fresh companion.
         }
     }
 
