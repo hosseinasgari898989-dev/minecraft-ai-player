@@ -155,7 +155,7 @@ public final class AiIntentClient {
     }
 
     private static String normalizeEndpoint(String baseUrl) {
-        String endpoint = baseUrl.replaceAll("/+$/", "");
+        String endpoint = baseUrl.replaceAll("/+$", "");
         if (!endpoint.endsWith("/chat/completions")) {
             endpoint += "/chat/completions";
         }
