@@ -262,7 +262,7 @@ public class AiPlayerMod implements ModInitializer {
             return;
         }
 
-        String instruction = extractBotInstruction(rawMessage);
+        String instruction = extractBotInstruction(player, rawMessage);
         if (instruction == null || instruction.isBlank()) {
             return;
         }
@@ -387,7 +387,7 @@ public class AiPlayerMod implements ModInitializer {
         }
     }
 
-    private static String extractBotInstruction(String rawMessage) {
+    private static String extractBotInstruction(ServerPlayerEntity player, String rawMessage) {
         if (rawMessage == null) {
             return null;
         }
@@ -397,7 +397,8 @@ public class AiPlayerMod implements ModInitializer {
             return null;
         }
 
-        if (!aiConfig.requirePrefix()) {
+        boolean singleplayer = player.getServer() != null && player.getServer().isSingleplayer();
+        if (!aiConfig.requirePrefix() && singleplayer) {
             return input;
         }
 
@@ -549,7 +550,7 @@ public class AiPlayerMod implements ModInitializer {
             String rawAction,
             boolean enabled
     ) {
-        String action = rawAction.trim().toUpperCase(java.util.Locale.ROOT);
+        String action = RobotCommandPlanner.normalizeAction(rawAction);
         if (action.isBlank()) {
             source.sendError(Text.literal("نام توانایی را وارد کن."));
             return 0;
