@@ -204,13 +204,32 @@ public class AiPlayerMod implements ModInitializer {
         final AiPlayerEntity commandRobot = robot;
 
         if (!aiClient.isConfigured()) {
+            AgentMemoryStore.State offlineMemory = AgentMemoryStore.load(player.getUuid());
+            AgentMemoryStore.addChat(
+                    offlineMemory,
+                    "user",
+                    instruction,
+                    aiConfig.memoryMessages()
+            );
+
             RobotCommandPlanner.Plan localPlan = RobotCommandPlanner.plan(instruction);
+            String offlineReply;
             if (localPlan != null && aiConfig.isActionEnabled(localPlan.mode().name())) {
                 robot.applyPlan(localPlan);
-                player.sendMessage(Text.literal("🤖 " + localPlan.description()), false);
+                offlineReply = "AI تنظیم نیست؛ فرمان شناخته‌شده را اجرا کردم: " + localPlan.description();
             } else {
-                player.sendMessage(Text.literal("🤖 AI هنوز تنظیم نشده یا این کار پشتیبانی نمی‌شود."), false);
+                offlineReply = "AI تنظیم نیست؛ پیام را در حافظه نگه داشتم تا بعداً ادامه بدهیم.";
             }
+
+            AgentMemoryStore.addChat(
+                    offlineMemory,
+                    "assistant",
+                    offlineReply,
+                    aiConfig.memoryMessages()
+            );
+            AgentMemoryStore.save(player.getUuid(), offlineMemory);
+
+            player.sendMessage(Text.literal("🤖 " + offlineReply), false);
             return;
         }
 
