@@ -9,7 +9,7 @@ import net.minecraft.util.Identifier;
 
 public class AiPlayerRenderer extends BipedEntityRenderer<AiPlayerEntity, PlayerEntityModel<AiPlayerEntity>> {
     private static final Identifier TEXTURE =
-            new Identifier("minecraft", "textures/entity/steve.png");
+            new Identifier("ai_player", "textures/entity/ai_player.png");
 
     public AiPlayerRenderer(EntityRendererFactory.Context context) {
         super(
