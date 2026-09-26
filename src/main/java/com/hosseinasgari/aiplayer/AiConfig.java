@@ -20,7 +20,7 @@ public final class AiConfig {
     private boolean enabled = true;
     private String baseUrl = "https://your-provider.example/v1";
     private String apiKey = "";
-    private String model = "your-model";
+    private String model = "kimi-k2.5";
     private String triggerPrefix = "ربات";
     private int timeoutSeconds = 30;
     private boolean chatEnabled = true;
@@ -55,6 +55,9 @@ public final class AiConfig {
             config.baseUrl = properties.getProperty("base_url", config.baseUrl).trim();
             config.apiKey = properties.getProperty("api_key", "").trim();
             config.model = properties.getProperty("model", config.model).trim();
+            if (config.model.equalsIgnoreCase("your-model")) {
+                config.model = "kimi-k2.5";
+            }
             config.triggerPrefix = properties.getProperty("trigger_prefix", config.triggerPrefix).trim();
             config.chatEnabled = Boolean.parseBoolean(
                     properties.getProperty("chat_enabled", Boolean.toString(config.chatEnabled))
