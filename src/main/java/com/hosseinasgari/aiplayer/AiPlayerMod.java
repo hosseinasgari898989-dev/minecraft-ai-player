@@ -137,6 +137,30 @@ public class AiPlayerMod implements ModInitializer {
                                             .executes(context -> showAiStatus(context.getSource()))
                             )
                             .then(
+                                    literal("aitest")
+                                            .executes(context -> {
+                                                var source = context.getSource();
+                                                Thread.ofVirtual().start(() -> {
+                                                    try {
+                                                        int status = aiClient.ping();
+                                                        source.getServer().execute(() ->
+                                                                source.sendFeedback(
+                                                                        () -> Text.literal("اتصال AI محلی: HTTP " + status),
+                                                                        false
+                                                                )
+                                                        );
+                                                    } catch (Exception error) {
+                                                        source.getServer().execute(() ->
+                                                                source.sendError(
+                                                                        Text.literal("اتصال AI محلی برقرار نشد: " + error.getMessage())
+                                                                )
+                                                        );
+                                                    }
+                                                });
+                                                return 1;
+                                            })
+                            )
+                            .then(
                                     literal("aireload")
                                             .executes(context -> reloadAiConfig(context.getSource()))
                             )
@@ -460,6 +484,7 @@ public class AiPlayerMod implements ModInitializer {
         source.sendFeedback(() -> Text.literal("§fربات با چت طبیعی کنترل می‌شود؛ مثلاً: §eبرو چوب جمع کن"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer aistatus §f- وضعیت AI و مدل"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer aireload §f- بارگذاری دوباره تنظیمات"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer aitest §f- تست اتصال مستقیم به AI محلی"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer un <action> §f- غیرفعال کردن یک توانایی"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer on <action> §f- فعال کردن توانایی"), false);
         source.sendFeedback(() -> Text.literal("§e/aiplayer update §f- به‌روزرسانی مود"), false);
@@ -472,6 +497,7 @@ public class AiPlayerMod implements ModInitializer {
         source.sendFeedback(() -> Text.literal("§fفعال: §e" + aiConfig.isEnabled()), false);
         source.sendFeedback(() -> Text.literal("§fتنظیم شده: §e" + aiClient.isConfigured()), false);
         source.sendFeedback(() -> Text.literal("§fمدل: §e" + aiClient.model()), false);
+        source.sendFeedback(() -> Text.literal("§fآدرس: §e" + aiConfig.baseUrl()), false);
         source.sendFeedback(() -> Text.literal("§fگفتگو: §e" + aiConfig.chatEnabled()), false);
         source.sendFeedback(() -> Text.literal("§fاسپان خودکار: §e" + aiConfig.autoSpawn()), false);
         source.sendFeedback(() -> Text.literal("§fغیرفعال‌ها: §e" + aiConfig.disabledActionsRaw()), false);
