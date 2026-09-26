@@ -130,28 +130,6 @@ public class AiPlayerMod implements ModInitializer {
                                             })
                             )
                             .then(
-                                    literal("command")
-                                            .then(
-                                                    argument("instruction", greedyString())
-                                                            .executes(context -> applyInstruction(
-                                                                    context.getSource().getPlayerOrThrow(),
-                                                                    getString(context, "instruction"),
-                                                                    context.getSource()
-                                                            ))
-                                            )
-                            )
-                            .then(
-                                    literal("do")
-                                            .then(
-                                                    argument("instruction", greedyString())
-                                                            .executes(context -> applyInstruction(
-                                                                    context.getSource().getPlayerOrThrow(),
-                                                                    getString(context, "instruction"),
-                                                                    context.getSource()
-                                                            ))
-                                            )
-                            )
-                            .then(
                                     literal("status")
                                             .executes(context -> showStatus(
                                                     context.getSource().getPlayerOrThrow(),
@@ -184,54 +162,6 @@ public class AiPlayerMod implements ModInitializer {
                                                 );
                                                 return 1;
                                             })
-                            )
-                            .then(
-                                    literal("follow")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "follow me",
-                                                    context.getSource()
-                                            ))
-                            )
-                            .then(
-                                    literal("protect")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "protect me",
-                                                    context.getSource()
-                                            ))
-                            )
-                            .then(
-                                    literal("guard")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "guard here",
-                                                    context.getSource()
-                                            ))
-                            )
-                            .then(
-                                    literal("patrol")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "patrol",
-                                                    context.getSource()
-                                            ))
-                            )
-                            .then(
-                                    literal("explore")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "explore",
-                                                    context.getSource()
-                                            ))
-                            )
-                            .then(
-                                    literal("stop")
-                                            .executes(context -> applyInstruction(
-                                                    context.getSource().getPlayerOrThrow(),
-                                                    "stop",
-                                                    context.getSource()
-                                            ))
                             )
                             .then(
                                     literal("un")
