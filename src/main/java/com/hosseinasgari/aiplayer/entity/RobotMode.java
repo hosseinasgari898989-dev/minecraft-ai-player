@@ -4,8 +4,14 @@ public enum RobotMode {
     IDLE,
     FOLLOW,
     WANDER,
+    EXPLORE,
     GUARD,
     PROTECT,
+    PATROL,
+    RETURN_HOME,
     GATHER_WOOD,
-    BUILD_HOUSE
+    GATHER_STONE,
+    GATHER_COAL,
+    BUILD_HOUSE,
+    BUILD_TOWER
 }
