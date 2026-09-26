@@ -5,6 +5,8 @@ import com.hosseinasgari.aiplayer.entity.ModEntities;
 import com.hosseinasgari.aiplayer.entity.RobotCommandPlanner;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -19,7 +21,12 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +47,8 @@ public class AiPlayerMod implements ModInitializer {
     private static AiConfig aiConfig;
     private static AiIntentClient aiClient;
     private static final Set<UUID> AI_REQUESTS_IN_FLIGHT = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, List<AiIntentClient.ChatTurn>> CHAT_MEMORY = new ConcurrentHashMap<>();
+    private static long companionCheckTicker;
 
     @Override
     public void onInitialize() {
@@ -47,6 +56,24 @@ public class AiPlayerMod implements ModInitializer {
 
         aiConfig = AiConfig.load();
         aiClient = new AiIntentClient(aiConfig);
+
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                server.execute(() -> ensureTemporaryCompanion(handler.getPlayer()))
+        );
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            removeOwnedRobots(server, handler.getPlayer().getUuid());
+            CHAT_MEMORY.remove(handler.getPlayer().getUuid());
+            AI_REQUESTS_IN_FLIGHT.remove(handler.getPlayer().getUuid());
+        });
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            companionCheckTicker++;
+            if (companionCheckTicker % 40L != 0L) {
+                return;
+            }
+            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                ensureTemporaryCompanion(player);
+            }
+        });
 
         ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) ->
                 handleNaturalLanguageChat(sender, message.getContent().getString())
@@ -215,6 +242,20 @@ public class AiPlayerMod implements ModInitializer {
                                             ))
                             )
                             .then(
+                                    literal("un")
+                                            .then(argument("action", greedyString())
+                                                    .executes(context -> setActionEnabled(
+                                                            context.getSource(), getString(context, "action"), false
+                                                    )))
+                            )
+                            .then(
+                                    literal("on")
+                                            .then(argument("action", greedyString())
+                                                    .executes(context -> setActionEnabled(
+                                                            context.getSource(), getString(context, "action"), true
+                                                    )))
+                            )
+                            .then(
                                     literal("update")
                                             .executes(context -> updateMod(context.getSource()))
                             )
@@ -223,55 +264,73 @@ public class AiPlayerMod implements ModInitializer {
     }
 
     private static void handleNaturalLanguageChat(ServerPlayerEntity player, String rawMessage) {
+        if (!aiConfig.chatEnabled()) {
+            return;
+        }
+
         String instruction = extractBotInstruction(rawMessage);
         if (instruction == null || instruction.isBlank()) {
             return;
         }
 
-        if (findOwnedRobot(player) == null) {
-            player.sendMessage(Text.literal("🤖 اول رباتت را با /aiplayer spawn ظاهر کن."), false);
+        AiPlayerEntity robot = findOwnedRobot(player);
+        if (robot == null && aiConfig.autoSpawn()) {
+            ensureTemporaryCompanion(player);
+            robot = findOwnedRobot(player);
+        }
+
+        if (robot == null) {
+            player.sendMessage(Text.literal("🤖 ربات همراه پیدا نشد."), false);
             return;
         }
 
         if (!aiClient.isConfigured()) {
             RobotCommandPlanner.Plan localPlan = RobotCommandPlanner.plan(instruction);
-            if (localPlan == null) {
-                player.sendMessage(
-                        Text.literal("🤖 هوش مصنوعی هنوز تنظیم نشده؛ فایل config/ai-player.properties را تنظیم کن."),
-                        false
-                );
-                return;
+            if (localPlan != null && aiConfig.isActionEnabled(localPlan.mode().name())) {
+                robot.applyPlan(localPlan);
+                player.sendMessage(Text.literal("🤖 " + localPlan.description()), false);
+            } else {
+                player.sendMessage(Text.literal("🤖 AI هنوز تنظیم نشده یا این کار پشتیبانی نمی‌شود."), false);
             }
-
-            findOwnedRobot(player).applyPlan(localPlan);
-            player.sendMessage(Text.literal("🤖 " + localPlan.description()), false);
             return;
         }
 
         if (!AI_REQUESTS_IN_FLIGHT.add(player.getUuid())) {
-            player.sendMessage(Text.literal("🤖 هنوز دارم فرمان قبلی را تحلیل می‌کنم..."), false);
+            player.sendMessage(Text.literal("🤖 یک پیام هنوز در حال پردازش است..."), false);
             return;
         }
 
-        player.sendMessage(Text.literal("🤖 دارم فرمانت را بررسی می‌کنم..."), false);
+        String context = buildRobotContext(robot);
+        List<AiIntentClient.ChatTurn> memory =
+                new ArrayList<>(CHAT_MEMORY.getOrDefault(player.getUuid(), List.of()));
 
         Thread.ofVirtual().start(() -> {
             try {
-                Optional<RobotCommandPlanner.Plan> result = aiClient.classify(instruction);
+                Optional<AiIntentClient.Decision> result =
+                        aiClient.chat(instruction, context, memory);
 
                 player.getServer().execute(() -> {
                     try {
                         if (result.isEmpty()) {
-                            RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
-                            if (fallback != null) {
-                                applyPlanFromAi(player, fallback);
-                            } else {
-                                player.sendMessage(Text.literal("🤖 این کار را هنوز بلد نیستم."), false);
-                            }
+                            player.sendMessage(Text.literal("🤖 پاسخی از AI نگرفتم."), false);
                             return;
                         }
 
-                        applyPlanFromAi(player, result.get());
+                        AiIntentClient.Decision decision = result.get();
+                        String reply = decision.reply();
+
+                        if (!reply.isBlank()) {
+                            player.sendMessage(
+                                    Text.literal("§dAI Player§f: " + reply),
+                                    false
+                            );
+                        }
+
+                        if (decision.plan() != null) {
+                            robot.applyPlan(decision.plan());
+                        }
+
+                        rememberChat(player.getUuid(), instruction, reply);
                     } finally {
                         AI_REQUESTS_IN_FLIGHT.remove(player.getUuid());
                     }
@@ -280,15 +339,15 @@ public class AiPlayerMod implements ModInitializer {
                 player.getServer().execute(() -> {
                     try {
                         RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
-                        if (fallback != null) {
-                            applyPlanFromAi(player, fallback);
+                        if (fallback != null && aiConfig.isActionEnabled(fallback.mode().name())) {
+                            robot.applyPlan(fallback);
                             player.sendMessage(
-                                    Text.literal("🤖 اتصال AI خطا داد؛ از فرمان داخلی استفاده کردم."),
+                                    Text.literal("§dAI Player§f: ارتباط با AI مشکل داشت؛ فرمان مستقیم را اجرا کردم."),
                                     false
                             );
                         } else {
                             player.sendMessage(
-                                    Text.literal("🤖 اتصال به AI ناموفق بود. تنظیمات API را بررسی کن."),
+                                    Text.literal("§dAI Player§f: ارتباط با AI برقرار نشد."),
                                     false
                             );
                         }
@@ -300,26 +359,67 @@ public class AiPlayerMod implements ModInitializer {
         });
     }
 
+    private static String buildRobotContext(AiPlayerEntity robot) {
+        var pos = robot.getBlockPos();
+        String home = robot.getHomePos() == null
+                ? "unset"
+                : robot.getHomePos().getX() + "," + robot.getHomePos().getY() + "," + robot.getHomePos().getZ();
+
+        return "mode=" + robot.getMode().name()
+                + "; task=" + robot.getTaskDescription()
+                + "; health=" + robot.getHealth()
+                + "; position=" + pos.getX() + "," + pos.getY() + "," + pos.getZ()
+                + "; home=" + home
+                + "; commands=" + robot.getCommandsExecuted()
+                + "; blocksBroken=" + robot.getBlocksBroken()
+                + "; blocksPlaced=" + robot.getBlocksPlaced()
+                + "; attacks=" + robot.getAttacksMade();
+    }
+
+    private static void rememberChat(UUID playerUuid, String userMessage, String assistantMessage) {
+        List<AiIntentClient.ChatTurn> history =
+                CHAT_MEMORY.computeIfAbsent(playerUuid, key -> new ArrayList<>());
+
+        history.add(new AiIntentClient.ChatTurn("user", userMessage));
+        if (assistantMessage != null && !assistantMessage.isBlank()) {
+            history.add(new AiIntentClient.ChatTurn("assistant", assistantMessage));
+        }
+
+        int maxEntries = Math.max(2, aiConfig.memoryMessages() * 2);
+        while (history.size() > maxEntries) {
+            history.remove(0);
+        }
+    }
+
     private static String extractBotInstruction(String rawMessage) {
         if (rawMessage == null) {
             return null;
         }
 
         String input = rawMessage.trim();
+        if (input.isBlank()) {
+            return null;
+        }
+
+        if (!aiConfig.requirePrefix()) {
+            return input;
+        }
+
+        String prefix = aiConfig.triggerPrefix();
         String[] prefixes = {
-                aiConfig.triggerPrefix() + " ",
-                aiConfig.triggerPrefix() + ":",
-                "@" + aiConfig.triggerPrefix() + " ",
-                "@" + aiConfig.triggerPrefix() + ":",
+                prefix + " ",
+                prefix + ":",
+                "@" + prefix + " ",
+                "@" + prefix + ":",
                 "bot ",
                 "bot:",
                 "@bot ",
                 "@bot:"
         };
 
-        for (String prefix : prefixes) {
-            if (input.regionMatches(true, 0, prefix, 0, prefix.length())) {
-                return input.substring(prefix.length()).trim();
+        for (String candidate : prefixes) {
+            if (input.regionMatches(true, 0, candidate, 0, candidate.length())) {
+                return input.substring(candidate.length()).trim();
             }
         }
 
@@ -369,46 +469,26 @@ public class AiPlayerMod implements ModInitializer {
     }
 
     private static int showHelp(net.minecraft.server.command.ServerCommandSource source) {
-        source.sendFeedback(() -> Text.literal("§6===== دستورهای AI Player ====="), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer spawn §f- ساختن ربات و وصل‌کردن آن به شما"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer follow §f- دنبال‌کردن شما"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer protect §f- محافظت از شما و حمله به دشمن‌ها"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer guard §f- نگهبانی از محل خانه"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer patrol §f- گشت‌زنی اطراف خانه"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer explore §f- کاوش و رفتن به نقاط مختلف"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer sethome §f- ذخیره محل فعلی به‌عنوان خانه ربات"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer stop §f- توقف کامل کار فعلی"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer status §f- نمایش وضعیت، سلامت و آمار ربات"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer aistatus §f- وضعیت اتصال هوش مصنوعی"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer aireload §f- بارگذاری دوباره تنظیمات AI"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer command <دستور> §f- دستور مستقیم طبیعی فارسی یا انگلیسی"), false);
-        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات برو چوب جمع کن"), false);
-        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات خونه بساز"), false);
-        source.sendFeedback(() -> Text.literal("§7برای AI: §fربات دنبالم بیا"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer hello §f- تست نصب مود"), false);
-        source.sendFeedback(() -> Text.literal("§e/aiplayer update §f- دریافت آخرین نسخه از GitHub"), false);
-        source.sendFeedback(() -> Text.literal("§6================================"), false);
+        source.sendFeedback(() -> Text.literal("§6===== AI Player ====="), false);
+        source.sendFeedback(() -> Text.literal("§fربات با چت طبیعی کنترل می‌شود؛ مثلاً: §eبرو چوب جمع کن"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer aistatus §f- وضعیت AI و مدل"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer aireload §f- بارگذاری دوباره تنظیمات"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer un <action> §f- غیرفعال کردن یک توانایی"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer on <action> §f- فعال کردن توانایی"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer update §f- به‌روزرسانی مود"), false);
+        source.sendFeedback(() -> Text.literal("§7ربات هنگام ورود شما به جهان به‌طور خودکار حاضر می‌شود."), false);
         return 1;
     }
 
     private static int showAiStatus(net.minecraft.server.command.ServerCommandSource source) {
         source.sendFeedback(() -> Text.literal("§6===== وضعیت AI ====="), false);
-        source.sendFeedback(
-                () -> Text.literal("§fفعال: §e" + aiConfig.isEnabled()),
-                false
-        );
-        source.sendFeedback(
-                () -> Text.literal("§fتنظیم شده: §e" + aiClient.isConfigured()),
-                false
-        );
-        source.sendFeedback(
-                () -> Text.literal("§fمدل: §e" + aiClient.model()),
-                false
-        );
-        source.sendFeedback(
-                () -> Text.literal("§fفایل تنظیمات: §e" + AiConfig.getConfigPath()),
-                false
-        );
+        source.sendFeedback(() -> Text.literal("§fفعال: §e" + aiConfig.isEnabled()), false);
+        source.sendFeedback(() -> Text.literal("§fتنظیم شده: §e" + aiClient.isConfigured()), false);
+        source.sendFeedback(() -> Text.literal("§fمدل: §e" + aiClient.model()), false);
+        source.sendFeedback(() -> Text.literal("§fگفتگو: §e" + aiConfig.chatEnabled()), false);
+        source.sendFeedback(() -> Text.literal("§fاسپان خودکار: §e" + aiConfig.autoSpawn()), false);
+        source.sendFeedback(() -> Text.literal("§fغیرفعال‌ها: §e" + aiConfig.disabledActionsRaw()), false);
+        source.sendFeedback(() -> Text.literal("§fفایل: §e" + AiConfig.getConfigPath()), false);
         source.sendFeedback(() -> Text.literal("§6===================="), false);
         return 1;
     }
@@ -466,6 +546,109 @@ public class AiPlayerMod implements ModInitializer {
                 .stream()
                 .min((a, b) -> Double.compare(player.squaredDistanceTo(a), player.squaredDistanceTo(b)))
                 .orElse(null);
+    }
+
+    private static int setActionEnabled(
+            net.minecraft.server.command.ServerCommandSource source,
+            String rawAction,
+            boolean enabled
+    ) {
+        String action = rawAction.trim().toUpperCase(java.util.Locale.ROOT);
+        if (action.isBlank()) {
+            source.sendError(Text.literal("نام توانایی را وارد کن."));
+            return 0;
+        }
+
+        aiConfig = AiConfig.load();
+        if (enabled) {
+            aiConfig.enableAction(action);
+        } else {
+            aiConfig.disableAction(action);
+        }
+        aiConfig.save();
+        aiClient.reload(aiConfig);
+
+        source.sendFeedback(
+                () -> Text.literal(
+                        enabled ? "توانایی فعال شد: " + action : "توانایی غیرفعال شد: " + action
+                ),
+                false
+        );
+        return 1;
+    }
+
+    private static void ensureTemporaryCompanion(ServerPlayerEntity player) {
+        if (!aiConfig.autoSpawn() || !player.isAlive()) {
+            return;
+        }
+
+        var server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        if (aiConfig.singleCompanion() && server.isSingleplayer()) {
+            for (var world : server.getWorlds()) {
+                for (AiPlayerEntity robot : world.getEntitiesByType(ModEntities.AI_PLAYER, entity -> true)) {
+                    robot.discard();
+                }
+            }
+        } else {
+            removeOwnedRobots(server, player.getUuid(), player.getServerWorld());
+        }
+
+        AiPlayerEntity entity = ModEntities.AI_PLAYER.create(player.getServerWorld());
+        if (entity == null) {
+            return;
+        }
+
+        entity.refreshPositionAndAngles(
+                player.getX() + 2.0,
+                player.getY(),
+                player.getZ() + 2.0,
+                player.getYaw(),
+                0.0f
+        );
+        entity.setCustomName(Text.literal("AI Player"));
+        entity.setCustomNameVisible(true);
+        entity.setOwner(player);
+        player.getServerWorld().spawnEntity(entity);
+    }
+
+    private static void removeOwnedRobots(net.minecraft.server.MinecraftServer server, UUID ownerUuid) {
+        for (var world : server.getWorlds()) {
+            for (AiPlayerEntity robot : world.getEntitiesByType(
+                    ModEntities.AI_PLAYER,
+                    entity -> ownerUuid.equals(entity.getOwnerUuid())
+            )) {
+                robot.discard();
+            }
+        }
+    }
+
+    private static void removeOwnedRobots(
+            net.minecraft.server.MinecraftServer server,
+            UUID ownerUuid,
+            net.minecraft.server.world.ServerWorld keepWorld
+    ) {
+        AiPlayerEntity keeper = null;
+
+        for (var world : server.getWorlds()) {
+            for (AiPlayerEntity robot : world.getEntitiesByType(
+                    ModEntities.AI_PLAYER,
+                    entity -> ownerUuid.equals(entity.getOwnerUuid())
+            )) {
+                if (world == keepWorld && keeper == null) {
+                    keeper = robot;
+                } else {
+                    robot.discard();
+                }
+            }
+        }
+
+        if (keeper == null && keepWorld.getPlayers().contains(server.getPlayerManager().getPlayer(ownerUuid))) {
+            // The caller will spawn a fresh companion.
+        }
     }
 
     private static int updateMod(net.minecraft.server.command.ServerCommandSource source) {
