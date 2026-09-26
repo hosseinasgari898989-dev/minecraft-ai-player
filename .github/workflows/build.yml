@@ -34,7 +34,7 @@ jobs:
       - name: Publish latest JAR into repository
         run: |
           mkdir -p latest
-          cp build/libs/ai-player-0.1.0.jar latest/ai-player.jar
+          cp build/libs/ai-player-*.jar latest/ai-player.jar
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add latest/ai-player.jar
@@ -46,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ai-player-jar
-          path: build/libs/ai-player-0.1.0.jar
+          path: build/libs/ai-player-*.jar
           if-no-files-found: error
