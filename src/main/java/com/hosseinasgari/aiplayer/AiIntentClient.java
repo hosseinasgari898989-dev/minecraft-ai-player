@@ -98,7 +98,7 @@ public final class AiIntentClient {
         }
 
         String content = extractAssistantContent(response.body());
-        return RobotCommandPlanner.planAction(extractAction(content));
+        return Optional.ofNullable(RobotCommandPlanner.planAction(extractAction(content)));
     }
 
     private static String extractAssistantContent(String responseBody) {
