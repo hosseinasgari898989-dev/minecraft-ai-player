@@ -284,6 +284,8 @@ public class AiPlayerMod implements ModInitializer {
             return;
         }
 
+        final AiPlayerEntity commandRobot = robot;
+
         if (!aiClient.isConfigured()) {
             RobotCommandPlanner.Plan localPlan = RobotCommandPlanner.plan(instruction);
             if (localPlan != null && aiConfig.isActionEnabled(localPlan.mode().name())) {
@@ -327,7 +329,7 @@ public class AiPlayerMod implements ModInitializer {
                         }
 
                         if (decision.plan() != null) {
-                            robot.applyPlan(decision.plan());
+                            commandRobot.applyPlan(decision.plan());
                         }
 
                         rememberChat(player.getUuid(), instruction, reply);
@@ -340,7 +342,7 @@ public class AiPlayerMod implements ModInitializer {
                     try {
                         RobotCommandPlanner.Plan fallback = RobotCommandPlanner.plan(instruction);
                         if (fallback != null && aiConfig.isActionEnabled(fallback.mode().name())) {
-                            robot.applyPlan(fallback);
+                            commandRobot.applyPlan(fallback);
                             player.sendMessage(
                                     Text.literal("§dAI Player§f: ارتباط با AI مشکل داشت؛ فرمان مستقیم را اجرا کردم."),
                                     false
