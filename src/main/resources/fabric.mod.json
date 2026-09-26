@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "ai_player",
+  "version": "${version}",
+  "name": "AI Player",
+  "description": "A Fabric mod that will grow into an AI-controlled Minecraft player.",
+  "authors": ["Hossein"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.hosseinasgari.aiplayer.AiPlayerMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~1.20.6",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
