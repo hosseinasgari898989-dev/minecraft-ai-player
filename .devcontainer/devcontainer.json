@@ -1,0 +1,13 @@
+{
+  "name": "llama.cpp RPC server",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postCreateCommand": "bash scripts/setup-rpc-codespace.sh",
+  "forwardPorts": [50052],
+  "portsAttributes": {
+    "50052": {
+      "label": "llama.cpp RPC",
+      "protocol": "tcp",
+      "visibility": "private"
+    }
+  }
+}
