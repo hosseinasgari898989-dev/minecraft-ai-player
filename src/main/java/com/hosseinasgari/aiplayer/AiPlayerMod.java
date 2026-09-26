@@ -261,12 +261,23 @@ public class AiPlayerMod implements ModInitializer {
             return 0;
         }
 
-        source.sendFeedback(
-                () -> Text.literal(
-                        "AI Player | mode=" + robot.getMode().name() + " | task=" + robot.getTaskDescription()
-                ),
-                false
-        );
+        var pos = robot.getBlockPos();
+        var home = robot.getHomePos();
+        String homeText = home == null
+                ? "ثبت نشده"
+                : home.getX() + ", " + home.getY() + ", " + home.getZ();
+
+        source.sendFeedback(() -> Text.literal("§6===== وضعیت AI Player ====="), false);
+        source.sendFeedback(() -> Text.literal("§fحالت: §e" + robot.getMode().name()), false);
+        source.sendFeedback(() -> Text.literal("§fکار فعلی: §e" + robot.getTaskDescription()), false);
+        source.sendFeedback(() -> Text.literal(String.format("§fسلامت: §e%.1f/%.1f", robot.getHealth(), robot.getMaxHealth())), false);
+        source.sendFeedback(() -> Text.literal("§fموقعیت: §e" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()), false);
+        source.sendFeedback(() -> Text.literal("§fخانه: §e" + homeText), false);
+        source.sendFeedback(() -> Text.literal("§fفرمان‌های اجراشده: §e" + robot.getCommandsExecuted()), false);
+        source.sendFeedback(() -> Text.literal("§fبلوک‌های شکسته‌شده: §e" + robot.getBlocksBroken()), false);
+        source.sendFeedback(() -> Text.literal("§fبلوک‌های ساخته‌شده: §e" + robot.getBlocksPlaced()), false);
+        source.sendFeedback(() -> Text.literal("§fحملات: §e" + robot.getAttacksMade()), false);
+        source.sendFeedback(() -> Text.literal("§6==========================="), false);
         return 1;
     }
 
