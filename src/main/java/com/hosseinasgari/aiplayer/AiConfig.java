@@ -7,7 +7,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class AiConfig {
     private static final Path CONFIG_PATH =
@@ -19,6 +23,12 @@ public final class AiConfig {
     private String model = "your-model";
     private String triggerPrefix = "ربات";
     private int timeoutSeconds = 30;
+    private boolean chatEnabled = true;
+    private boolean requirePrefix = false;
+    private boolean autoSpawn = true;
+    private boolean singleCompanion = true;
+    private int memoryMessages = 12;
+    private String disabledActions = "";
 
     private AiConfig() {
     }
@@ -46,6 +56,33 @@ public final class AiConfig {
             config.apiKey = properties.getProperty("api_key", "").trim();
             config.model = properties.getProperty("model", config.model).trim();
             config.triggerPrefix = properties.getProperty("trigger_prefix", config.triggerPrefix).trim();
+            config.chatEnabled = Boolean.parseBoolean(
+                    properties.getProperty("chat_enabled", Boolean.toString(config.chatEnabled))
+            );
+            config.requirePrefix = Boolean.parseBoolean(
+                    properties.getProperty("require_prefix", Boolean.toString(config.requirePrefix))
+            );
+            config.autoSpawn = Boolean.parseBoolean(
+                    properties.getProperty("auto_spawn", Boolean.toString(config.autoSpawn))
+            );
+            config.singleCompanion = Boolean.parseBoolean(
+                    properties.getProperty("single_companion", Boolean.toString(config.singleCompanion))
+            );
+            config.disabledActions = properties.getProperty("disabled_actions", "").trim();
+
+            try {
+                config.memoryMessages = Math.max(
+                        0,
+                        Math.min(30, Integer.parseInt(
+                                properties.getProperty(
+                                        "memory_messages",
+                                        Integer.toString(config.memoryMessages)
+                                )
+                        ))
+                );
+            } catch (NumberFormatException ignored) {
+                config.memoryMessages = 12;
+            }
 
             try {
                 config.timeoutSeconds = Math.max(
@@ -75,6 +112,12 @@ public final class AiConfig {
         properties.setProperty("model", model);
         properties.setProperty("trigger_prefix", triggerPrefix);
         properties.setProperty("timeout_seconds", Integer.toString(timeoutSeconds));
+        properties.setProperty("chat_enabled", Boolean.toString(chatEnabled));
+        properties.setProperty("require_prefix", Boolean.toString(requirePrefix));
+        properties.setProperty("auto_spawn", Boolean.toString(autoSpawn));
+        properties.setProperty("single_companion", Boolean.toString(singleCompanion));
+        properties.setProperty("memory_messages", Integer.toString(memoryMessages));
+        properties.setProperty("disabled_actions", disabledActions);
 
         try {
             Files.createDirectories(CONFIG_PATH.getParent());
@@ -120,6 +163,64 @@ public final class AiConfig {
 
     public int timeoutSeconds() {
         return timeoutSeconds;
+    }
+
+    public boolean chatEnabled() {
+        return chatEnabled;
+    }
+
+    public boolean requirePrefix() {
+        return requirePrefix;
+    }
+
+    public boolean autoSpawn() {
+        return autoSpawn;
+    }
+
+    public boolean singleCompanion() {
+        return singleCompanion;
+    }
+
+    public int memoryMessages() {
+        return memoryMessages;
+    }
+
+    public Set<String> disabledActions() {
+        if (disabledActions.isBlank()) {
+            return Set.of();
+        }
+
+        Set<String> result = new HashSet<>();
+        for (String raw : disabledActions.split(",")) {
+            String action = raw.trim().toUpperCase(Locale.ROOT);
+            if (!action.isBlank()) {
+                result.add(action);
+            }
+        }
+        return result;
+    }
+
+    public boolean isActionEnabled(String action) {
+        if (action == null || action.isBlank()) {
+            return false;
+        }
+        return !disabledActions().contains(action.trim().toUpperCase(Locale.ROOT));
+    }
+
+    public void disableAction(String action) {
+        Set<String> actions = new HashSet<>(disabledActions());
+        actions.add(action.trim().toUpperCase(Locale.ROOT));
+        disabledActions = actions.stream().sorted().collect(Collectors.joining(","));
+    }
+
+    public void enableAction(String action) {
+        Set<String> actions = new HashSet<>(disabledActions());
+        actions.remove(action.trim().toUpperCase(Locale.ROOT));
+        disabledActions = actions.stream().sorted().collect(Collectors.joining(","));
+    }
+
+    public String disabledActionsRaw() {
+        return disabledActions;
     }
 
     public static Path getConfigPath() {
