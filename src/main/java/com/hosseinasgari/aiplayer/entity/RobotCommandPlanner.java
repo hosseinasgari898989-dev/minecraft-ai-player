@@ -70,6 +70,29 @@ public final class RobotCommandPlanner {
         return null;
     }
 
+    public static Plan planAction(String action) {
+        if (action == null || action.isBlank()) {
+            return null;
+        }
+
+        return switch (action.trim().toUpperCase(Locale.ROOT)) {
+            case "IDLE", "STOP" -> new Plan(RobotMode.IDLE, "stopped");
+            case "FOLLOW" -> new Plan(RobotMode.FOLLOW, "follow owner");
+            case "WANDER" -> new Plan(RobotMode.WANDER, "wander nearby");
+            case "EXPLORE" -> new Plan(RobotMode.EXPLORE, "explore the area");
+            case "GUARD" -> new Plan(RobotMode.GUARD, "guard home");
+            case "PROTECT" -> new Plan(RobotMode.PROTECT, "protect owner");
+            case "PATROL" -> new Plan(RobotMode.PATROL, "patrol around home");
+            case "RETURN_HOME" -> new Plan(RobotMode.RETURN_HOME, "return home");
+            case "GATHER_WOOD" -> new Plan(RobotMode.GATHER_WOOD, "gather wood");
+            case "GATHER_STONE" -> new Plan(RobotMode.GATHER_STONE, "gather stone");
+            case "GATHER_COAL" -> new Plan(RobotMode.GATHER_COAL, "gather coal");
+            case "BUILD_HOUSE" -> new Plan(RobotMode.BUILD_HOUSE, "build a house");
+            case "BUILD_TOWER" -> new Plan(RobotMode.BUILD_TOWER, "build a tower");
+            default -> null;
+        };
+    }
+
     private static boolean containsAny(String input, String... phrases) {
         for (String phrase : phrases) {
             if (input.contains(phrase)) {
