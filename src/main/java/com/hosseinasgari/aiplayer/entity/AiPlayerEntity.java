@@ -18,6 +18,9 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.UUID;
 
 public class AiPlayerEntity extends PathAwareEntity {
@@ -52,6 +55,7 @@ public class AiPlayerEntity extends PathAwareEntity {
     private int blocksBroken;
     private int blocksPlaced;
     private int attacksMade;
+    private final Deque<RobotCommandPlanner.Plan> agentPlanQueue = new ArrayDeque<>();
 
     public AiPlayerEntity(EntityType<? extends AiPlayerEntity> entityType, World world) {
         super(entityType, world);
@@ -91,6 +95,7 @@ public class AiPlayerEntity extends PathAwareEntity {
         }
 
         if (time % 10L == 0L) {
+            startNextAgentPlanIfIdle();
             runTaskBrain();
         }
 
@@ -248,7 +253,7 @@ public class AiPlayerEntity extends PathAwareEntity {
         if (returnToPosition(homePos, 3.0)) {
             this.getNavigation().stop();
             taskDescription = "home reached";
-            mode = RobotMode.GUARD;
+            finishAgentStep(RobotMode.GUARD);
         }
     }
 
@@ -322,8 +327,7 @@ public class AiPlayerEntity extends PathAwareEntity {
 
         if (gatheredCount >= targetCount) {
             taskDescription = resourceTask.name().toLowerCase() + " gathered: " + gatheredCount;
-            mode = RobotMode.IDLE;
-            this.getNavigation().stop();
+            finishAgentStep(RobotMode.IDLE);
             return;
         }
 
@@ -409,8 +413,7 @@ public class AiPlayerEntity extends PathAwareEntity {
         BlockPos target = getHouseBlock(homePos, buildIndex);
         if (target == null) {
             taskDescription = "house complete";
-            mode = RobotMode.GUARD;
-            this.getNavigation().stop();
+            finishAgentStep(RobotMode.GUARD);
             return;
         }
 
@@ -477,8 +480,7 @@ public class AiPlayerEntity extends PathAwareEntity {
         BlockPos target = getTowerBlock(homePos, buildIndex);
         if (target == null) {
             taskDescription = "tower complete";
-            mode = RobotMode.GUARD;
-            this.getNavigation().stop();
+            finishAgentStep(RobotMode.GUARD);
             return;
         }
 
@@ -688,6 +690,57 @@ public class AiPlayerEntity extends PathAwareEntity {
     }
 
     public void applyPlan(RobotCommandPlanner.Plan plan) {
+        agentPlanQueue.clear();
+        applyPlanInternal(plan);
+    }
+
+    public void enqueueAgentPlans(List<RobotCommandPlanner.Plan> plans) {
+        agentPlanQueue.clear();
+        if (plans == null || plans.isEmpty()) {
+            applyPlanInternal(new RobotCommandPlanner.Plan(RobotMode.IDLE, "idle"));
+            return;
+        }
+
+        for (RobotCommandPlanner.Plan plan : plans) {
+            if (plan != null && agentPlanQueue.size() < 8) {
+                agentPlanQueue.addLast(plan);
+            }
+        }
+
+        this.getNavigation().stop();
+        startNextAgentPlanIfIdle();
+    }
+
+    public int getQueuedPlanCount() {
+        return agentPlanQueue.size();
+    }
+
+    private void startNextAgentPlanIfIdle() {
+        if (mode != RobotMode.IDLE || agentPlanQueue.isEmpty()) {
+            return;
+        }
+
+        RobotCommandPlanner.Plan next = agentPlanQueue.removeFirst();
+        applyPlanInternal(next);
+    }
+
+    private void finishAgentStep(RobotMode fallbackMode) {
+        if (!agentPlanQueue.isEmpty()) {
+            mode = RobotMode.IDLE;
+            this.getNavigation().stop();
+            startNextAgentPlanIfIdle();
+            return;
+        }
+
+        mode = fallbackMode;
+        this.getNavigation().stop();
+    }
+
+    private void applyPlanInternal(RobotCommandPlanner.Plan plan) {
+        if (plan == null) {
+            return;
+        }
+
         this.mode = plan.mode();
         this.taskDescription = plan.description();
         this.commandsExecuted++;

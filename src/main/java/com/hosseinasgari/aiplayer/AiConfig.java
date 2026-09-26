@@ -14,13 +14,16 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class AiConfig {
+    private static final String LOCAL_BASE_URL = "http://127.0.0.1:8080/v1";
+    private static final String LOCAL_MODEL = "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF:Q4_K_M";
+
     private static final Path CONFIG_PATH =
             FabricLoader.getInstance().getConfigDir().resolve("ai-player.properties");
 
     private boolean enabled = true;
-    private String baseUrl = "https://your-provider.example/v1";
-    private String apiKey = "";
-    private String model = "kimi-k2.5";
+    private String baseUrl = LOCAL_BASE_URL;
+    private String apiKey = "local";
+    private String model = LOCAL_MODEL;
     private String triggerPrefix = "ربات";
     private int timeoutSeconds = 30;
     private boolean chatEnabled = true;
@@ -72,6 +75,24 @@ public final class AiConfig {
                     properties.getProperty("single_companion", Boolean.toString(config.singleCompanion))
             );
             config.disabledActions = properties.getProperty("disabled_actions", "").trim();
+
+            // Migrate the old placeholder/Kimi default to the local llama.cpp brain.
+            boolean localEndpoint = isLocalBaseUrl(config.baseUrl);
+            boolean staleDefault = config.baseUrl.contains("your-provider.example")
+                    || (config.apiKey.isBlank() && config.model.equalsIgnoreCase("kimi-k2.5"));
+            if (staleDefault || (localEndpoint && (
+                    config.model.isBlank()
+                            || config.model.equalsIgnoreCase("kimi-k2.5")
+                            || config.model.equalsIgnoreCase("your-model")
+            ))) {
+                config.baseUrl = LOCAL_BASE_URL;
+                config.apiKey = "local";
+                config.model = LOCAL_MODEL;
+                config.save();
+            } else if (localEndpoint && config.apiKey.isBlank()) {
+                config.apiKey = "local";
+                config.save();
+            }
 
             try {
                 config.memoryMessages = Math.max(
@@ -139,13 +160,29 @@ public final class AiConfig {
         return enabled;
     }
 
+    private static boolean isLocalBaseUrl(String url) {
+        return url != null && (
+                url.startsWith("http://127.0.0.1:")
+                        || url.startsWith("http://localhost:")
+                        || url.startsWith("http://0.0.0.0:")
+        );
+    }
+
     public boolean isConfigured() {
-        return enabled
-                && !apiKey.isBlank()
-                && !baseUrl.isBlank()
-                && !model.isBlank()
-                && !baseUrl.contains("your-provider.example")
-                && !model.equalsIgnoreCase("your-model");
+        if (!enabled
+                || baseUrl.isBlank()
+                || model.isBlank()
+                || baseUrl.contains("your-provider.example")
+                || model.equalsIgnoreCase("your-model")) {
+            return false;
+        }
+
+        // Local llama.cpp/Ollama-style servers do not need an API key.
+        boolean local = baseUrl.startsWith("http://127.0.0.1:")
+                || baseUrl.startsWith("http://localhost:")
+                || baseUrl.startsWith("http://0.0.0.0:");
+
+        return local || !apiKey.isBlank();
     }
 
     public String baseUrl() {
