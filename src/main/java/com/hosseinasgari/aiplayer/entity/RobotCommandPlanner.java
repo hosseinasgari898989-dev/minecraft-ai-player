@@ -39,15 +39,15 @@ public final class RobotCommandPlanner {
             return new Plan(RobotMode.RETURN_HOME, "return home");
         }
 
-        if (containsAny(input, "wood", "gather wood", "collect wood", "چوب", "هیزم", "چوب جمع کن")) {
+        if (containsAny(input, "wood", "gather wood", "collect wood", "چوب", "هیزم", "چوب جمع کن", "چوب بیار", "چوب تهیه کن")) {
             return new Plan(RobotMode.GATHER_WOOD, "gather wood");
         }
 
-        if (containsAny(input, "stone", "cobblestone", "gather stone", "سنگ", "کابل استون", "سنگ جمع کن")) {
+        if (containsAny(input, "stone", "cobblestone", "gather stone", "سنگ", "کابل استون", "سنگ جمع کن", "سنگ بیار")) {
             return new Plan(RobotMode.GATHER_STONE, "gather stone");
         }
 
-        if (containsAny(input, "coal", "gather coal", "زغال", "زغال سنگ", "زغال جمع کن")) {
+        if (containsAny(input, "coal", "gather coal", "زغال", "زغال سنگ", "زغال جمع کن", "زغال بیار")) {
             return new Plan(RobotMode.GATHER_COAL, "gather coal");
         }
 
@@ -70,12 +70,66 @@ public final class RobotCommandPlanner {
         return null;
     }
 
+    public static String normalizeAction(String rawAction) {
+        if (rawAction == null || rawAction.isBlank()) {
+            return "";
+        }
+
+        String value = rawAction.trim().toLowerCase(Locale.ROOT);
+
+        if (containsAny(value, "wood", "چوب", "هیزم")) {
+            return "GATHER_WOOD";
+        }
+        if (containsAny(value, "stone", "cobblestone", "سنگ")) {
+            return "GATHER_STONE";
+        }
+        if (containsAny(value, "coal", "زغال")) {
+            return "GATHER_COAL";
+        }
+        if (containsAny(value, "house", "home", "خانه", "خونه")) {
+            return "BUILD_HOUSE";
+        }
+        if (containsAny(value, "tower", "برج")) {
+            return "BUILD_TOWER";
+        }
+        if (containsAny(value, "follow", "دنبال", "دنبالم")) {
+            return "FOLLOW";
+        }
+        if (containsAny(value, "protect", "محافظت")) {
+            return "PROTECT";
+        }
+        if (containsAny(value, "guard", "نگهبان", "نگهبانی")) {
+            return "GUARD";
+        }
+        if (containsAny(value, "patrol", "گشت")) {
+            return "PATROL";
+        }
+        if (containsAny(value, "explore", "کاوش", "جستجو")) {
+            return "EXPLORE";
+        }
+        if (containsAny(value, "wander", "بگرد")) {
+            return "WANDER";
+        }
+        if (containsAny(value, "return_home", "return home", "برگرد خونه", "برگرد خانه")) {
+            return "RETURN_HOME";
+        }
+        if (containsAny(value, "idle", "stop", "توقف", "وایسا", "بس کن")) {
+            return "IDLE";
+        }
+
+        return value
+                .replaceAll("[^A-Za-z0-9_]+", "_")
+                .replaceAll("^_+|_+$", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
     public static Plan planAction(String action) {
-        if (action == null || action.isBlank()) {
+        String normalized = normalizeAction(action);
+        if (normalized.isBlank()) {
             return null;
         }
 
-        return switch (action.trim().toUpperCase(Locale.ROOT)) {
+        return switch (normalized) {
             case "IDLE", "STOP" -> new Plan(RobotMode.IDLE, "stopped");
             case "FOLLOW" -> new Plan(RobotMode.FOLLOW, "follow owner");
             case "WANDER" -> new Plan(RobotMode.WANDER, "wander nearby");
