@@ -50,6 +50,10 @@ public class AiPlayerMod implements ModInitializer {
                                             })
                             )
                             .then(
+                                    literal("help")
+                                            .executes(context -> showHelp(context.getSource()))
+                            )
+                            .then(
                                     literal("spawn")
                                             .executes(context -> {
                                                 if (!(context.getSource().getEntity() instanceof ServerPlayerEntity player)) {
@@ -120,6 +124,65 @@ public class AiPlayerMod implements ModInitializer {
                                             ))
                             )
                             .then(
+                                    literal("sethome")
+                                            .executes(context -> {
+                                                var player = context.getSource().getPlayerOrThrow();
+                                                var robot = findOwnedRobot(player);
+                                                if (robot == null) {
+                                                    context.getSource().sendError(
+                                                            Text.literal("اول /aiplayer spawn را بزن.")
+                                                    );
+                                                    return 0;
+                                                }
+                                                robot.setHome();
+                                                context.getSource().sendFeedback(
+                                                        () -> Text.literal("خانه ربات ذخیره شد."),
+                                                        false
+                                                );
+                                                return 1;
+                                            })
+                            )
+                            .then(
+                                    literal("follow")
+                                            .executes(context -> applyInstruction(
+                                                    context.getSource().getPlayerOrThrow(),
+                                                    "follow me",
+                                                    context.getSource()
+                                            ))
+                            )
+                            .then(
+                                    literal("protect")
+                                            .executes(context -> applyInstruction(
+                                                    context.getSource().getPlayerOrThrow(),
+                                                    "protect me",
+                                                    context.getSource()
+                                            ))
+                            )
+                            .then(
+                                    literal("guard")
+                                            .executes(context -> applyInstruction(
+                                                    context.getSource().getPlayerOrThrow(),
+                                                    "guard here",
+                                                    context.getSource()
+                                            ))
+                            )
+                            .then(
+                                    literal("patrol")
+                                            .executes(context -> applyInstruction(
+                                                    context.getSource().getPlayerOrThrow(),
+                                                    "patrol",
+                                                    context.getSource()
+                                            ))
+                            )
+                            .then(
+                                    literal("explore")
+                                            .executes(context -> applyInstruction(
+                                                    context.getSource().getPlayerOrThrow(),
+                                                    "explore",
+                                                    context.getSource()
+                                            ))
+                            )
+                            .then(
                                     literal("stop")
                                             .executes(context -> applyInstruction(
                                                     context.getSource().getPlayerOrThrow(),
@@ -163,6 +226,28 @@ public class AiPlayerMod implements ModInitializer {
                 () -> Text.literal("Robot command accepted: " + plan.description()),
                 false
         );
+        return 1;
+    }
+
+    private static int showHelp(net.minecraft.server.command.ServerCommandSource source) {
+        source.sendFeedback(() -> Text.literal("§6===== دستورهای AI Player ====="), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer spawn §f- ساختن ربات و وصل‌کردن آن به شما"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer follow §f- دنبال‌کردن شما"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer protect §f- محافظت از شما و حمله به دشمن‌ها"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer guard §f- نگهبانی از محل خانه"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer patrol §f- گشت‌زنی اطراف خانه"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer explore §f- کاوش و رفتن به نقاط مختلف"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer sethome §f- ذخیره محل فعلی به‌عنوان خانه ربات"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer stop §f- توقف کامل کار فعلی"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer status §f- نمایش وضعیت، سلامت و آمار ربات"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer command <دستور> §f- دستور طبیعی فارسی یا انگلیسی"), false);
+        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command چوب جمع کن"), false);
+        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command خونه بساز"), false);
+        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command برگرد خونه"), false);
+        source.sendFeedback(() -> Text.literal("§7نمونه: §f/aiplayer command برج بساز"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer hello §f- تست نصب مود"), false);
+        source.sendFeedback(() -> Text.literal("§e/aiplayer update §f- دریافت آخرین نسخه از GitHub"), false);
+        source.sendFeedback(() -> Text.literal("§6================================"), false);
         return 1;
     }
 
