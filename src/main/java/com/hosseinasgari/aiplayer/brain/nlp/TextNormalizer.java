@@ -10,20 +10,19 @@ import java.util.regex.Pattern;
 public final class TextNormalizer {
     private static final Pattern PERSIAN_SCRIPT = Pattern.compile("[\\u0600-\\u06FF]");
     private static final Pattern DIACRITICS = Pattern.compile("[\\u064B-\\u065F\\u0670\\u0640]");
-    private static final Pattern PUNCTUATION = Pattern.compile("[.,!?;:،؛؟\\"'«»()\\[\\]{}]+");
+    private static final Pattern PUNCTUATION = Pattern.compile("[.,!?;:،؛؟«»(){}]+");
     private static final Pattern MULTI_SPACE = Pattern.compile("\\s+");
     private static final Pattern FIRST_INTEGER = Pattern.compile("\\b(\\d{1,4})\\b");
 
     private static final Map<String, Integer> NUMBER_WORDS = Map.ofEntries(
             Map.entry("one", 1), Map.entry("two", 2), Map.entry("three", 3), Map.entry("four", 4),
-            Map.entry("five", 5), Map.entry("six", 6), Map.entry("eight", 8), Map.entry("ten", 10),
-            Map.entry("twelve", 12), Map.entry("dozen", 12), Map.entry("sixteen", 16),
-            Map.entry("twenty", 20), Map.entry("thirtytwo", 32), Map.entry("stack", 64),
-            Map.entry("یک", 1), Map.entry("یه", 1), Map.entry("دو", 2), Map.entry("سه", 3),
-            Map.entry("چهار", 4), Map.entry("پنج", 5), Map.entry("شش", 6), Map.entry("هشت", 8),
-            Map.entry("ده", 10), Map.entry("دوازده", 12), Map.entry("شانزده", 16),
-            Map.entry("شونزده", 16), Map.entry("بیست", 20), Map.entry("سی", 30),
-            Map.entry("شصت", 60), Map.entry("استک", 64)
+            Map.entry("five", 5), Map.entry("eight", 8), Map.entry("ten", 10), Map.entry("twelve", 12),
+            Map.entry("dozen", 12), Map.entry("sixteen", 16), Map.entry("twenty", 20),
+            Map.entry("thirtytwo", 32), Map.entry("stack", 64), Map.entry("یک", 1),
+            Map.entry("یه", 1), Map.entry("دو", 2), Map.entry("سه", 3), Map.entry("چهار", 4),
+            Map.entry("پنج", 5), Map.entry("شش", 6), Map.entry("هشت", 8), Map.entry("ده", 10),
+            Map.entry("دوازده", 12), Map.entry("شانزده", 16), Map.entry("شونزده", 16),
+            Map.entry("بیست", 20), Map.entry("سی", 30), Map.entry("شصت", 60), Map.entry("استک", 64)
     );
 
     private TextNormalizer() {}
@@ -49,7 +48,7 @@ public final class TextNormalizer {
                     case '\u0643', '\u06A9' -> sb.append('\u06A9');
                     case '\u0629' -> sb.append('\u0647');
                     case '\u0624' -> sb.append('\u0648');
-                    case '\u0623', '\u0625', '\u0622' -> { if (ch == '\u0622') sb.append('\u0622'); else sb.append('\u0627'); }
+                    case '\u0623', '\u0625' -> sb.append('\u0627');
                     case '\u200C', '\u200D', '\uFEFF' -> sb.append(' ');
                     default -> sb.append(ch);
                 }
