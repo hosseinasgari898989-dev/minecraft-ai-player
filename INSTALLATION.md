@@ -28,6 +28,15 @@ Direct links return 404 until the first successful artifact-publishing workflow 
 3. Spawn with `/function aiplayer/spawn` or issue a command with `/scriptevent aiplayer:cmd Follow me.`.
 4. The chat listener is used where the installed Bedrock runtime exposes it. Script-event commands are the explicit fallback.
 
+## Avoiding AI work on the phone
+
+GitHub stores the files; it does not run the NPC brain for your world. This build has a deterministic local brain and does not call a hosted LLM or download a neural-network model while playing.
+
+- In Bedrock single-player on Android, the game simulation and Add-On scripts run on the phone. The brain is rule-based and the resource scan is bounded/cached, but actual lag still needs a live test on your device.
+- To move the NPC's world logic off the phone, host a **Minecraft Bedrock Dedicated Server** on a separate PC or server, install both AI Player packs on that server's world, and join from the phone. The server performs the world simulation and NPC script work; the phone still handles rendering and normal client processing.
+- A GitHub repository by itself cannot act as the live brain. An external web service would need to be deployed and connected intentionally; that is not required by this offline build.
+
+
 ## Verification status
 
 A successful CI build verifies Java compilation, automated tests, JSON/manifest validity, ZIP integrity, and packaging. It does not replace an interactive test in a live Minecraft client. Bedrock execution and all in-game behavior should be tested in a copied test world before use in a valued survival world.
