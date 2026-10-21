@@ -16,7 +16,7 @@ test("Bedrock manifests, dependency UUIDs, entity IDs, model and texture are val
   assert.equal(bp.format_version, 2);
   assert.equal(rp.format_version, 2);
   assert.ok(bp.dependencies.some((d) => d.uuid === rp.header.uuid));
-  assert.ok(rp.dependencies.some((d) => d.uuid === bp.header.uuid));
+  assert.ok(!(rp.dependencies ?? []).some((d) => d.uuid === bp.header.uuid), "Resource Pack must not depend back on Behavior Pack (avoid dependency cycle).");
   assert.ok(bp.dependencies.some((d) => d.module_name === "@minecraft/server" && !d.version.includes("beta")));
   const serverEntity = JSON.parse(fs.readFileSync(path.join(ROOT, "bedrock/AIPlayer_BP/entities/ai_player.json"), "utf8"));
   const clientEntity = JSON.parse(fs.readFileSync(path.join(ROOT, "bedrock/AIPlayer_RP/entity/ai_player.entity.json"), "utf8"));
