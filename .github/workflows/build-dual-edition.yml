@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - "arena/**"
+    paths-ignore:
+      - "latest/**"
+      - "dist/**"
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,17 +33,29 @@ jobs:
         run: gradle clean test build --no-daemon
       - name: Run Bedrock brain and manifest tests
         run: node --test tests/bedrock-and-parity.test.mjs
-      - name: Package Bedrock Add-On and source archive
+      - name: Validate and package installers and source archive
+        run: node tools/package-all.mjs
+      - name: Publish direct-download artifacts to this feature branch
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/arena/')
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/distributions
-          (cd bedrock/AIPlayer_BP && zip -qr ../../build/distributions/AIPlayer_BP.mcpack .)
-          (cd bedrock/AIPlayer_RP && zip -qr ../../build/distributions/AIPlayer_RP.mcpack .)
-          (cd build/distributions && zip -q AIPlayer-Bedrock-0.2.0.mcaddon AIPlayer_BP.mcpack AIPlayer_RP.mcpack)
-          zip -qr build/distributions/minecraft-ai-player-dual-edition-source.zip .             -x ".git/*" ".gradle/*" "build/*" "latest/ai-player.jar"
-          unzip -t build/distributions/AIPlayer-Bedrock-0.2.0.mcaddon
-          unzip -t build/distributions/minecraft-ai-player-dual-edition-source.zip
+          mkdir -p dist latest
+          cp build/libs/ai-player-0.2.0.jar latest/ai-player.jar
+          cp build/libs/ai-player-0.2.0.jar dist/ai-player.jar
+          cp build/distributions/AIPlayer-Bedrock-0.2.0.mcaddon dist/
+          cp build/distributions/AIPlayer_BP.mcpack dist/
+          cp build/distributions/AIPlayer_RP.mcpack dist/
+          cp build/distributions/minecraft-ai-player-dual-edition-source.zip dist/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest/ai-player.jar dist/
+          if git diff --cached --quiet; then
+            echo "Installable artifacts are already current."
+          else
+            git commit -m "chore: publish verified dual-edition installers [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
       - name: Upload installable artifacts
         uses: actions/upload-artifact@v4
         with:

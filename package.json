@@ -1,0 +1,11 @@
+{
+  "name": "minecraft-ai-player",
+  "private": true,
+  "type": "module",
+  "version": "0.2.0",
+  "description": "Dual-edition offline AI Player source and packager",
+  "scripts": {
+    "test:bedrock": "node --test tests/bedrock-and-parity.test.mjs",
+    "package": "node tools/package-all.mjs"
+  }
+}
