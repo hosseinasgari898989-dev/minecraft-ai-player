@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiplayer.local/schemas/task.schema.json",
+  "title": "AIPlayerTaskSpec",
+  "description": "Hierarchical goal and task state specification shared between Java/Fabric and Bedrock.",
+  "type": "object",
+  "required": ["id", "intent", "priority", "status", "subtasks", "progressCurrent", "progressTarget", "retryCount", "maxRetries"],
+  "properties": {
+    "id": {"type": "string"},
+    "intent": {"type": "string"},
+    "priority": {"type": "integer", "description": "100=EMERGENCY_SURVIVAL, 85=OWNER_PROTECTION, 75=RETURN_TO_OWNER, 60=ASSIGNED_TASK, 55=SUBTASK_DEPENDENCY, 40=AUTONOMOUS_SURVIVAL, 15=IDLE_EXPLORATION"},
+    "status": {"type": "string", "enum": ["PENDING", "ACTIVE", "SUSPENDED", "COMPLETED", "CANCELLED", "FAILED"]},
+    "requiredResources": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "subtasks": {"type": "array", "items": {"type": "object", "required": ["skill", "status"], "properties": {"skill": {"type": "string"}, "targetCount": {"type": "integer"}, "completedCount": {"type": "integer"}, "status": {"type": "string"}}}},
+    "progressCurrent": {"type": "integer", "minimum": 0},
+    "progressTarget": {"type": "integer", "minimum": 0},
+    "retryCount": {"type": "integer", "minimum": 0},
+    "maxRetries": {"type": "integer", "minimum": 1},
+    "failureReason": {"type": "string", "enum": ["NONE", "ROUTE_BLOCKED", "RESOURCE_UNAVAILABLE", "INVENTORY_FULL", "CRAFTING_PREREQUISITE_MISSING", "TARGET_LOST", "SITE_UNSUITABLE", "PVP_NOT_AUTHORIZED", "ACTION_RETRIES_EXCEEDED", "TASK_TIMEOUT", "SAVED_TASK_INVALID"]}
+  }
+}

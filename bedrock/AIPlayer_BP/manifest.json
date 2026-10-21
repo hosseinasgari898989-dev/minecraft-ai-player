@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "AI Player Companion BP (Offline Brain v0.2.0)",
+    "description": "100% local, deterministic autonomous survival companion Behavior Pack for Minecraft Bedrock Edition (EN/FA commands, gathering, crafting, construction, guard & survival).",
+    "uuid": "7f3a9d12-4c8e-4b21-9e65-1a8f0c3d5e71",
+    "version": [0, 2, 0],
+    "min_engine_version": [1, 21, 0]
+  },
+  "modules": [
+    {"description": "Entity definitions and mcfunctions", "type": "data", "uuid": "2b8e4f60-9a13-4d72-8c54-6e0f1a2b3c4d", "version": [0, 2, 0]},
+    {"description": "Offline deterministic AI brain runtime (@minecraft/server stable)", "type": "script", "language": "javascript", "uuid": "9c4d1e82-5b37-4a69-b123-8f7e6d5c4b3a", "version": [0, 2, 0], "entry": "scripts/main.js"}
+  ],
+  "dependencies": [
+    {"uuid": "5e1c8a94-3d26-4f78-a901-2c4e6f8a0b1c", "version": [0, 2, 0]},
+    {"module_name": "@minecraft/server", "version": "1.11.0"}
+  ],
+  "metadata": {"authors": ["Hossein Asgari", "AI Player Engineering"], "license": "MIT"}
+}

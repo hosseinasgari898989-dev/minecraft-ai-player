@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiplayer.local/schemas/memory.schema.json",
+  "title": "AIPlayerPersistentMemory",
+  "type": "object",
+  "required": ["schemaVersion", "ownerId", "operatingMode", "followDistance", "guardRadius", "protectPlayerStructures", "allowEmergencyTeleport"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 2},
+    "ownerId": {"type": ["string", "null"]},
+    "ownerName": {"type": ["string", "null"]},
+    "preferredLanguage": {"type": "string", "enum": ["en", "fa"]},
+    "operatingMode": {"type": "string", "enum": ["COMPANION", "FOLLOW", "STAY", "GUARD", "RESOURCE_GATHERING", "CONSTRUCTION", "EXPLORATION", "RETURN_TO_OWNER", "IDLE", "AUTONOMOUS_SURVIVAL"]},
+    "homePosition": {"type": ["object", "null"], "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer"}, "dimension": {"type": "string"}}},
+    "guardPosition": {"type": ["object", "null"], "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer"}}},
+    "followDistance": {"type": "number", "minimum": 2.0, "maximum": 24.0},
+    "guardRadius": {"type": "number", "minimum": 4.0, "maximum": 48.0},
+    "protectPlayerStructures": {"type": "boolean"},
+    "allowEmergencyTeleport": {"type": "boolean"},
+    "authorizedPvpTargets": {"type": "array", "items": {"type": "string"}},
+    "activeBlueprintId": {"type": ["string", "null"]},
+    "activeBuildOrigin": {"type": ["object", "null"]},
+    "activeBuildIndex": {"type": "integer", "minimum": 0}
+  }
+}

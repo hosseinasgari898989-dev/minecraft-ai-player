@@ -1,0 +1,2 @@
+export interface ParsedIntent { intent: string; language: "en" | "fa"; normalizedInput: string; resource: string | null; quantity: number | null; structureStyle: string | null; targetPlayer: string | null; distance: number | null; pvpExplicitlyAuthorized: boolean; ambiguous: boolean; clarificationPrompt: string | null; unsupportedReason: string | null; }
+export function interpretCommand(rawInput: string): ParsedIntent;

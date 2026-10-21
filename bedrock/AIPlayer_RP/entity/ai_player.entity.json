@@ -1,0 +1,15 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "ai_player:companion",
+      "materials": {"default": "entity_alphatest"},
+      "textures": {"default": "textures/entity/ai_player"},
+      "geometry": {"default": "geometry.ai_player.humanoid"},
+      "animations": {"idle": "animation.ai_player.idle", "walk": "animation.ai_player.walk", "move_ctrl": "controller.animation.ai_player.move"},
+      "scripts": {"animate": ["move_ctrl"]},
+      "render_controllers": ["controller.render.ai_player"],
+      "spawn_egg": {"base_color": "#0F172A", "overlay_color": "#10B981"}
+    }
+  }
+}

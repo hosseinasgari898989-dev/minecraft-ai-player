@@ -1,0 +1,4 @@
+pack.name=AI Player Companion RP (v0.2.0)
+pack.description=64x64 player geometry, skin texture, and animations for AI Player.
+entity.ai_player:companion.name=AI Player
+item.spawn_egg.entity.ai_player:companion.name=Spawn AI Player

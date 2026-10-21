@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiplayer.local/schemas/intent.schema.json",
+  "title": "AIPlayerCommandIntent",
+  "description": "Canonical deterministic output of the offline English/Persian command interpreter.",
+  "type": "object",
+  "required": ["intent", "language", "normalizedInput", "ambiguous", "pvpExplicitlyAuthorized"],
+  "properties": {
+    "intent": {"type": "string", "enum": ["COME_HERE", "FOLLOW_OWNER", "STAY_BESIDE", "HOLD_POSITION", "PROTECT_OWNER", "PROTECT_NIGHT", "GUARD_AREA", "PATROL_AREA", "STOP", "CANCEL_TASK", "RESUME_TASK", "RETURN_OWNER", "RETURN_HOME", "SET_HOME", "GATHER_RESOURCE", "GO_MINING", "FIND_FOOD", "UPGRADE_TOOLS", "ORGANIZE_INVENTORY", "STORE_ITEMS", "BUILD_STRUCTURE", "PLANT_CROPS", "HARVEST_CROPS", "SCAN_THREATS", "FIND_PLAYER", "FOLLOW_PLAYER", "ATTACK_PLAYER", "EXPLORE", "STATUS_REPORT", "CLARIFY", "UNSUPPORTED"]},
+    "language": {"type": "string", "enum": ["en", "fa"]},
+    "normalizedInput": {"type": "string"},
+    "resource": {"type": ["string", "null"], "enum": ["wood", "stone", "coal", "iron", "food", "wheat", "seeds", null]},
+    "quantity": {"type": ["integer", "null"], "minimum": 1, "maximum": 2304},
+    "structureStyle": {"type": ["string", "null"], "enum": ["shelter", "compact_wood", "modern_house", "decorative_house", "small_farm", "watchtower", null]},
+    "targetPlayer": {"type": ["string", "null"]},
+    "distance": {"type": ["number", "null"], "minimum": 1, "maximum": 64},
+    "pvpExplicitlyAuthorized": {"type": "boolean"},
+    "ambiguous": {"type": "boolean"},
+    "clarificationPrompt": {"type": ["string", "null"]},
+    "unsupportedReason": {"type": ["string", "null"]}
+  }
+}

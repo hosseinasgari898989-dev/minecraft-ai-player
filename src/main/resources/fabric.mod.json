@@ -3,7 +3,7 @@
   "id": "ai_player",
   "version": "${version}",
   "name": "AI Player",
-  "description": "A Fabric mod that will grow into an AI-controlled Minecraft player.",
+  "description": "Autonomous, 100% offline deterministic player companion for Minecraft 1.20.6 with EN/FA command understanding, survival crafting, A* navigation, and blueprint construction.",
   "authors": ["Hossein"],
   "license": "MIT",
   "environment": "*",

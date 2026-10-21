@@ -13,201 +13,112 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Local deterministic configuration for AI Player.
+ * Requires zero API keys, zero hosted models, and zero internet connectivity.
+ */
 public final class AiConfig {
-    private static final Path CONFIG_PATH =
-            FabricLoader.getInstance().getConfigDir().resolve("ai-player.properties");
-
     private boolean enabled = true;
-    private String baseUrl = "https://your-provider.example/v1";
-    private String apiKey = "";
-    private String model = "kimi-k2.5";
     private String triggerPrefix = "ربات";
-    private int timeoutSeconds = 30;
     private boolean chatEnabled = true;
     private boolean requirePrefix = false;
     private boolean autoSpawn = true;
     private boolean singleCompanion = true;
-    private int memoryMessages = 12;
+    private int scanRadius = 18;
+    private double followDistance = 4.0;
+    private double guardRadius = 16.0;
+    private boolean protectPlayerStructures = true;
+    private boolean allowEmergencyTeleport = false;
     private String disabledActions = "";
 
-    private AiConfig() {
+    private AiConfig() {}
+
+    public static Path getConfigPath() {
+        return FabricLoader.getInstance().getConfigDir().resolve("ai-player.properties");
     }
+
+    public static AiConfig defaults() { return new AiConfig(); }
 
     public static AiConfig load() {
         AiConfig config = new AiConfig();
+        Path path;
+        try { path = getConfigPath(); } catch (Throwable ignored) { return config; }
 
         try {
-            Files.createDirectories(CONFIG_PATH.getParent());
-
-            if (Files.notExists(CONFIG_PATH)) {
-                config.save();
-                return config;
-            }
-
+            Files.createDirectories(path.getParent());
+            if (Files.notExists(path)) { config.save(); return config; }
             Properties properties = new Properties();
-            try (InputStream input = Files.newInputStream(CONFIG_PATH)) {
-                properties.load(input);
-            }
-
-            config.enabled = Boolean.parseBoolean(
-                    properties.getProperty("enabled", Boolean.toString(config.enabled))
-            );
-            config.baseUrl = properties.getProperty("base_url", config.baseUrl).trim();
-            config.apiKey = properties.getProperty("api_key", "").trim();
-            config.model = properties.getProperty("model", config.model).trim();
-            if (config.model.equalsIgnoreCase("your-model")) {
-                config.model = "kimi-k2.5";
-            }
+            try (InputStream input = Files.newInputStream(path)) { properties.load(input); }
+            config.enabled = Boolean.parseBoolean(properties.getProperty("enabled", "true"));
             config.triggerPrefix = properties.getProperty("trigger_prefix", config.triggerPrefix).trim();
-            config.chatEnabled = Boolean.parseBoolean(
-                    properties.getProperty("chat_enabled", Boolean.toString(config.chatEnabled))
-            );
-            config.requirePrefix = Boolean.parseBoolean(
-                    properties.getProperty("require_prefix", Boolean.toString(config.requirePrefix))
-            );
-            config.autoSpawn = Boolean.parseBoolean(
-                    properties.getProperty("auto_spawn", Boolean.toString(config.autoSpawn))
-            );
-            config.singleCompanion = Boolean.parseBoolean(
-                    properties.getProperty("single_companion", Boolean.toString(config.singleCompanion))
-            );
+            config.chatEnabled = Boolean.parseBoolean(properties.getProperty("chat_enabled", "true"));
+            config.requirePrefix = Boolean.parseBoolean(properties.getProperty("require_prefix", "false"));
+            config.autoSpawn = Boolean.parseBoolean(properties.getProperty("auto_spawn", "true"));
+            config.singleCompanion = Boolean.parseBoolean(properties.getProperty("single_companion", "true"));
+            config.protectPlayerStructures = Boolean.parseBoolean(properties.getProperty("protect_player_structures", "true"));
+            config.allowEmergencyTeleport = Boolean.parseBoolean(properties.getProperty("allow_emergency_teleport", "false"));
             config.disabledActions = properties.getProperty("disabled_actions", "").trim();
-
-            try {
-                config.memoryMessages = Math.max(
-                        0,
-                        Math.min(30, Integer.parseInt(
-                                properties.getProperty(
-                                        "memory_messages",
-                                        Integer.toString(config.memoryMessages)
-                                )
-                        ))
-                );
-            } catch (NumberFormatException ignored) {
-                config.memoryMessages = 12;
-            }
-
-            try {
-                config.timeoutSeconds = Math.max(
-                        5,
-                        Math.min(120, Integer.parseInt(
-                                properties.getProperty(
-                                        "timeout_seconds",
-                                        Integer.toString(config.timeoutSeconds)
-                                )
-                        ))
-                );
-            } catch (NumberFormatException ignored) {
-                config.timeoutSeconds = 30;
-            }
+            config.scanRadius = clampInt(properties.getProperty("scan_radius"), 18, 8, 32);
+            config.followDistance = clampDouble(properties.getProperty("follow_distance"), 4.0, 2.0, 24.0);
+            config.guardRadius = clampDouble(properties.getProperty("guard_radius"), 16.0, 4.0, 48.0);
         } catch (IOException ignored) {
-            // Keep safe in-memory defaults. The mod can still run without external AI.
+            // Safe local in-memory defaults.
         }
-
         return config;
     }
 
     public synchronized void save() {
         Properties properties = new Properties();
         properties.setProperty("enabled", Boolean.toString(enabled));
-        properties.setProperty("base_url", baseUrl);
-        properties.setProperty("api_key", apiKey);
-        properties.setProperty("model", model);
+        properties.setProperty("brain_mode", "offline-deterministic-v2");
         properties.setProperty("trigger_prefix", triggerPrefix);
-        properties.setProperty("timeout_seconds", Integer.toString(timeoutSeconds));
         properties.setProperty("chat_enabled", Boolean.toString(chatEnabled));
         properties.setProperty("require_prefix", Boolean.toString(requirePrefix));
         properties.setProperty("auto_spawn", Boolean.toString(autoSpawn));
         properties.setProperty("single_companion", Boolean.toString(singleCompanion));
-        properties.setProperty("memory_messages", Integer.toString(memoryMessages));
+        properties.setProperty("scan_radius", Integer.toString(scanRadius));
+        properties.setProperty("follow_distance", Double.toString(followDistance));
+        properties.setProperty("guard_radius", Double.toString(guardRadius));
+        properties.setProperty("protect_player_structures", Boolean.toString(protectPlayerStructures));
+        properties.setProperty("allow_emergency_teleport", Boolean.toString(allowEmergencyTeleport));
         properties.setProperty("disabled_actions", disabledActions);
-
         try {
-            Files.createDirectories(CONFIG_PATH.getParent());
-            try (OutputStream output = Files.newOutputStream(CONFIG_PATH)) {
-                properties.store(
-                        output,
-                        "AI Player external AI settings. Keep api_key private and never commit this file."
-                );
+            Path path = getConfigPath();
+            Files.createDirectories(path.getParent());
+            try (OutputStream output = Files.newOutputStream(path)) {
+                properties.store(output, "AI Player local deterministic brain settings (100% offline, no external LLM required).");
             }
-        } catch (IOException ignored) {
-            // Configuration is optional; keep runtime values in memory.
-        }
+        } catch (Throwable ignored) {}
     }
 
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public boolean isConfigured() {
-        return enabled
-                && !apiKey.isBlank()
-                && !baseUrl.isBlank()
-                && !model.isBlank()
-                && !baseUrl.contains("your-provider.example")
-                && !model.equalsIgnoreCase("your-model");
-    }
-
-    public String baseUrl() {
-        return baseUrl;
-    }
-
-    public String apiKey() {
-        return apiKey;
-    }
-
-    public String model() {
-        return model;
-    }
-
-    public String triggerPrefix() {
-        return triggerPrefix.isBlank() ? "ربات" : triggerPrefix;
-    }
-
-    public int timeoutSeconds() {
-        return timeoutSeconds;
-    }
-
-    public boolean chatEnabled() {
-        return chatEnabled;
-    }
-
-    public boolean requirePrefix() {
-        return requirePrefix;
-    }
-
-    public boolean autoSpawn() {
-        return autoSpawn;
-    }
-
-    public boolean singleCompanion() {
-        return singleCompanion;
-    }
-
-    public int memoryMessages() {
-        return memoryMessages;
-    }
+    public boolean isEnabled() { return enabled; }
+    public boolean isConfigured() { return enabled; }
+    public String model() { return "local-deterministic-brain-v2 (offline)"; }
+    public String triggerPrefix() { return triggerPrefix.isBlank() ? "ربات" : triggerPrefix; }
+    public boolean chatEnabled() { return chatEnabled; }
+    public boolean requirePrefix() { return requirePrefix; }
+    public boolean autoSpawn() { return autoSpawn; }
+    public boolean singleCompanion() { return singleCompanion; }
+    public int scanRadius() { return scanRadius; }
+    public double followDistance() { return followDistance; }
+    public double guardRadius() { return guardRadius; }
+    public boolean protectPlayerStructures() { return protectPlayerStructures; }
+    public boolean allowEmergencyTeleport() { return allowEmergencyTeleport; }
+    public void setAllowEmergencyTeleport(boolean value) { this.allowEmergencyTeleport = value; }
+    public String disabledActionsRaw() { return disabledActions.isBlank() ? "none" : disabledActions; }
 
     public Set<String> disabledActions() {
-        if (disabledActions.isBlank()) {
-            return Set.of();
-        }
-
+        if (disabledActions.isBlank()) return Set.of();
         Set<String> result = new HashSet<>();
         for (String raw : disabledActions.split(",")) {
             String action = raw.trim().toUpperCase(Locale.ROOT);
-            if (!action.isBlank()) {
-                result.add(action);
-            }
+            if (!action.isBlank()) result.add(action);
         }
         return result;
     }
 
     public boolean isActionEnabled(String action) {
-        if (action == null || action.isBlank()) {
-            return false;
-        }
-        return !disabledActions().contains(action.trim().toUpperCase(Locale.ROOT));
+        return action != null && !action.isBlank() && !disabledActions().contains(action.trim().toUpperCase(Locale.ROOT));
     }
 
     public void disableAction(String action) {
@@ -222,11 +133,15 @@ public final class AiConfig {
         disabledActions = actions.stream().sorted().collect(Collectors.joining(","));
     }
 
-    public String disabledActionsRaw() {
-        return disabledActions;
+    private static int clampInt(String value, int fallback, int min, int max) {
+        if (value == null) return fallback;
+        try { return Math.max(min, Math.min(max, Integer.parseInt(value.trim()))); }
+        catch (NumberFormatException ignored) { return fallback; }
     }
 
-    public static Path getConfigPath() {
-        return CONFIG_PATH;
+    private static double clampDouble(String value, double fallback, double min, double max) {
+        if (value == null) return fallback;
+        try { return Math.max(min, Math.min(max, Double.parseDouble(value.trim()))); }
+        catch (NumberFormatException ignored) { return fallback; }
     }
 }

@@ -1,0 +1,4 @@
+pack.name=بسته رفتاری همراه هوشمند AI Player (نسخه آفلاین ۰.۲.۰)
+pack.description=همراه کاملاً آفلاین و قانون‌محور برای ماینکرفت بدراک بدون نیاز به مدل زبانی خارجی.
+entity.ai_player:companion.name=همراه هوشمند
+item.spawn_egg.entity.ai_player:companion.name=تخم احضار همراه هوشمند

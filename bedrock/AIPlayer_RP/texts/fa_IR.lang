@@ -1,0 +1,4 @@
+pack.name=بسته منابع همراه هوشمند AI Player (نسخه ۰.۲.۰)
+pack.description=مدل انسانی ۶۴×۶۴، بافت و انیمیشن همراه هوشمند.
+entity.ai_player:companion.name=همراه هوشمند
+item.spawn_egg.entity.ai_player:companion.name=تخم احضار همراه هوشمند

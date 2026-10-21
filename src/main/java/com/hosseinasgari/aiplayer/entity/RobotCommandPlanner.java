@@ -1,158 +1,64 @@
 package com.hosseinasgari.aiplayer.entity;
 
-import java.util.Locale;
+import com.hosseinasgari.aiplayer.brain.model.CommandIntent;
+import com.hosseinasgari.aiplayer.brain.model.IntentType;
+import com.hosseinasgari.aiplayer.brain.nlp.RuleBasedCommandInterpreter;
 
 public final class RobotCommandPlanner {
-    public record Plan(RobotMode mode, String description) {}
-
-    private RobotCommandPlanner() {
+    public record Plan(RobotMode mode, String description, CommandIntent sourceIntent) {
+        public Plan(RobotMode mode, String description) {
+            this(mode, description, CommandIntent.simple(IntentType.FOLLOW_OWNER, "en", description));
+        }
     }
+
+    private RobotCommandPlanner() {}
 
     public static Plan plan(String raw) {
-        String input = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
-
-        if (input.isBlank()) {
-            return new Plan(RobotMode.IDLE, "idle");
-        }
-
-        if (containsAny(input, "stop", "stand still", "wait", "توقف", "وایسا", "صبر", "بیخیال", "بس کن")) {
-            return new Plan(RobotMode.IDLE, "stopped");
-        }
-
-        if (containsAny(input, "follow", "follow me", "come with me", "دنبالم", "دنبال من", "بیا")) {
-            return new Plan(RobotMode.FOLLOW, "follow owner");
-        }
-
-        if (containsAny(input, "protect", "protect me", "defend me", "bodyguard", "محافظت", "از من محافظت", "محافظم باش")) {
-            return new Plan(RobotMode.PROTECT, "protect owner");
-        }
-
-        if (containsAny(input, "guard", "stay here", "protect this place", "نگهبان", "نگهبانی", "اینجا بمون", "اینجا بمان")) {
-            return new Plan(RobotMode.GUARD, "guard home");
-        }
-
-        if (containsAny(input, "patrol", "patrol around", "گشت بزن", "گشت بده", "دور بزن")) {
-            return new Plan(RobotMode.PATROL, "patrol around home");
-        }
-
-        if (containsAny(input, "return home", "go home", "come home", "برگرد خونه", "برگرد خانه", "برو خونه", "برو خانه")) {
-            return new Plan(RobotMode.RETURN_HOME, "return home");
-        }
-
-        if (containsAny(input, "wood", "gather wood", "collect wood", "چوب", "هیزم", "چوب جمع کن", "چوب بیار", "چوب تهیه کن")) {
-            return new Plan(RobotMode.GATHER_WOOD, "gather wood");
-        }
-
-        if (containsAny(input, "stone", "cobblestone", "gather stone", "سنگ", "کابل استون", "سنگ جمع کن", "سنگ بیار")) {
-            return new Plan(RobotMode.GATHER_STONE, "gather stone");
-        }
-
-        if (containsAny(input, "coal", "gather coal", "زغال", "زغال سنگ", "زغال جمع کن", "زغال بیار")) {
-            return new Plan(RobotMode.GATHER_COAL, "gather coal");
-        }
-
-        if (containsAny(input, "house", "build a house", "build house", "خانه", "خونه", "ساختمان", "خانه بساز", "خونه بساز")) {
-            return new Plan(RobotMode.BUILD_HOUSE, "build a house");
-        }
-
-        if (containsAny(input, "tower", "build tower", "برج", "برج بساز")) {
-            return new Plan(RobotMode.BUILD_TOWER, "build a tower");
-        }
-
-        if (containsAny(input, "wander", "roam", "گشت", "بگرد", "دور و بر را بگرد")) {
-            return new Plan(RobotMode.WANDER, "wander nearby");
-        }
-
-        if (containsAny(input, "explore", "explore area", "کاوش", "جستجو", "اطراف را بگرد", "منطقه را بگرد")) {
-            return new Plan(RobotMode.EXPLORE, "explore the area");
-        }
-
-        return null;
+        CommandIntent intent = RuleBasedCommandInterpreter.interpret(raw);
+        if (intent.ambiguous() || intent.intent() == IntentType.UNSUPPORTED) return null;
+        return fromIntent(intent);
     }
 
-    public static String normalizeAction(String rawAction) {
-        if (rawAction == null || rawAction.isBlank()) {
-            return "";
-        }
-
-        String value = rawAction.trim().toLowerCase(Locale.ROOT);
-
-        if (containsAny(value, "wood", "چوب", "هیزم")) {
-            return "GATHER_WOOD";
-        }
-        if (containsAny(value, "stone", "cobblestone", "سنگ")) {
-            return "GATHER_STONE";
-        }
-        if (containsAny(value, "coal", "زغال")) {
-            return "GATHER_COAL";
-        }
-        if (containsAny(value, "house", "home", "خانه", "خونه")) {
-            return "BUILD_HOUSE";
-        }
-        if (containsAny(value, "tower", "برج")) {
-            return "BUILD_TOWER";
-        }
-        if (containsAny(value, "follow", "دنبال", "دنبالم")) {
-            return "FOLLOW";
-        }
-        if (containsAny(value, "protect", "محافظت")) {
-            return "PROTECT";
-        }
-        if (containsAny(value, "guard", "نگهبان", "نگهبانی")) {
-            return "GUARD";
-        }
-        if (containsAny(value, "patrol", "گشت")) {
-            return "PATROL";
-        }
-        if (containsAny(value, "explore", "کاوش", "جستجو")) {
-            return "EXPLORE";
-        }
-        if (containsAny(value, "wander", "بگرد")) {
-            return "WANDER";
-        }
-        if (containsAny(value, "return_home", "return home", "برگرد خونه", "برگرد خانه")) {
-            return "RETURN_HOME";
-        }
-        if (containsAny(value, "idle", "stop", "توقف", "وایسا", "بس کن")) {
-            return "IDLE";
-        }
-
-        return value
-                .replaceAll("[^A-Za-z0-9_]+", "_")
-                .replaceAll("^_+|_+$", "")
-                .toUpperCase(Locale.ROOT);
-    }
-
-    public static Plan planAction(String action) {
-        String normalized = normalizeAction(action);
-        if (normalized.isBlank()) {
-            return null;
-        }
-
-        return switch (normalized) {
-            case "IDLE", "STOP" -> new Plan(RobotMode.IDLE, "stopped");
-            case "FOLLOW" -> new Plan(RobotMode.FOLLOW, "follow owner");
-            case "WANDER" -> new Plan(RobotMode.WANDER, "wander nearby");
-            case "EXPLORE" -> new Plan(RobotMode.EXPLORE, "explore the area");
-            case "GUARD" -> new Plan(RobotMode.GUARD, "guard home");
-            case "PROTECT" -> new Plan(RobotMode.PROTECT, "protect owner");
-            case "PATROL" -> new Plan(RobotMode.PATROL, "patrol around home");
-            case "RETURN_HOME" -> new Plan(RobotMode.RETURN_HOME, "return home");
-            case "GATHER_WOOD" -> new Plan(RobotMode.GATHER_WOOD, "gather wood");
-            case "GATHER_STONE" -> new Plan(RobotMode.GATHER_STONE, "gather stone");
-            case "GATHER_COAL" -> new Plan(RobotMode.GATHER_COAL, "gather coal");
-            case "BUILD_HOUSE" -> new Plan(RobotMode.BUILD_HOUSE, "build a house");
-            case "BUILD_TOWER" -> new Plan(RobotMode.BUILD_TOWER, "build a tower");
-            default -> null;
-        };
-    }
-
-    private static boolean containsAny(String input, String... phrases) {
-        for (String phrase : phrases) {
-            if (input.contains(phrase)) {
-                return true;
+    public static Plan fromIntent(CommandIntent intent) {
+        return switch (intent.intent()) {
+            case STOP, CANCEL_TASK -> new Plan(RobotMode.IDLE, "stopped and cleared task", intent);
+            case COME_HERE, RETURN_OWNER -> new Plan(RobotMode.RETURN_OWNER, "returning to owner", intent);
+            case FOLLOW_OWNER, STAY_BESIDE -> new Plan(RobotMode.FOLLOW, "following owner", intent);
+            case HOLD_POSITION -> new Plan(RobotMode.STAY, "holding position", intent);
+            case PROTECT_OWNER, PROTECT_NIGHT -> new Plan(RobotMode.PROTECT, "protecting owner", intent);
+            case GUARD_AREA -> new Plan(RobotMode.GUARD, "guarding area", intent);
+            case PATROL_AREA -> new Plan(RobotMode.PATROL, "patrolling area", intent);
+            case RETURN_HOME -> new Plan(RobotMode.RETURN_HOME, "returning home", intent);
+            case SET_HOME -> new Plan(RobotMode.COMPANION, "updated home anchor", intent);
+            case GATHER_RESOURCE -> {
+                String res = intent.resource() == null ? "wood" : intent.resource();
+                int qty = intent.quantity() == null ? 8 : intent.quantity();
+                RobotMode m = switch (res) {
+                    case "stone" -> RobotMode.GATHER_STONE;
+                    case "coal" -> RobotMode.GATHER_COAL;
+                    case "iron" -> RobotMode.MINE_ORES;
+                    default -> RobotMode.GATHER_WOOD;
+                };
+                yield new Plan(m, "gather " + qty + " " + res, intent);
             }
-        }
-        return false;
+            case GO_MINING -> new Plan(RobotMode.MINE_ORES, "mining stone, coal, and iron", intent);
+            case FIND_FOOD -> new Plan(RobotMode.FIND_FOOD, "finding food", intent);
+            case UPGRADE_TOOLS -> new Plan(RobotMode.UPGRADE_TOOLS, "upgrading survival tools", intent);
+            case ORGANIZE_INVENTORY -> new Plan(RobotMode.ORGANIZE_INVENTORY, "organizing inventory", intent);
+            case STORE_ITEMS -> new Plan(RobotMode.STORE_ITEMS, "storing surplus in nearby chest", intent);
+            case PLANT_CROPS -> new Plan(RobotMode.PLANT_CROPS, "planting wheat crops", intent);
+            case HARVEST_CROPS -> new Plan(RobotMode.HARVEST_CROPS, "harvesting mature crops", intent);
+            case BUILD_STRUCTURE -> {
+                String style = intent.structureStyle() == null ? "compact_wood" : intent.structureStyle();
+                RobotMode m = "watchtower".equals(style) ? RobotMode.BUILD_TOWER : RobotMode.BUILD_HOUSE;
+                yield new Plan(m, "building " + style, intent);
+            }
+            case SCAN_THREATS -> new Plan(RobotMode.SCAN_THREATS, "scanning nearby threats", intent);
+            case FIND_PLAYER -> new Plan(RobotMode.FIND_PLAYER, "locating player " + intent.targetPlayer(), intent);
+            case FOLLOW_PLAYER -> new Plan(RobotMode.FOLLOW_PLAYER, "following player " + intent.targetPlayer(), intent);
+            case ATTACK_PLAYER -> new Plan(RobotMode.ENGAGE_PVP, "evaluating PvP target " + intent.targetPlayer(), intent);
+            case EXPLORE -> new Plan(RobotMode.EXPLORE, "exploring nearby terrain", intent);
+            default -> new Plan(RobotMode.COMPANION, "companion active", intent);
+        };
     }
 }

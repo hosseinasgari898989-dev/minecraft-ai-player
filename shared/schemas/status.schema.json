@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiplayer.local/schemas/status.schema.json",
+  "title": "AIPlayerStatusTelemetry",
+  "type": "object",
+  "required": ["edition", "operational", "offlineDeterministic", "mode", "activeGoal", "navigationState", "inventoryUsedSlots", "inventoryTotalSlots", "lastFailure"],
+  "properties": {
+    "edition": {"type": "string", "enum": ["JAVA_FABRIC_1_20_6", "BEDROCK_ADDON_1_21"]},
+    "operational": {"type": "boolean"},
+    "offlineDeterministic": {"type": "boolean", "const": true},
+    "ownerName": {"type": ["string", "null"]},
+    "mode": {"type": "string"},
+    "activeGoal": {"type": "string"},
+    "activeTaskSummary": {"type": "string"},
+    "suspendedTaskSummary": {"type": ["string", "null"]},
+    "currentTarget": {"type": ["string", "null"]},
+    "health": {"type": "number"},
+    "maxHealth": {"type": "number"},
+    "inventoryUsedSlots": {"type": "integer"},
+    "inventoryTotalSlots": {"type": "integer"},
+    "navigationState": {"type": "string", "enum": ["IDLE", "MOVING", "RECALCULATING", "STUCK_RECOVERY", "ARRIVED", "BLOCKED"]},
+    "lastFailure": {"type": "string"},
+    "availableSkills": {"type": "array", "items": {"type": "string"}}
+  }
+}

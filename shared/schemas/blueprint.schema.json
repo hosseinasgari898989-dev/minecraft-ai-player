@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiplayer.local/schemas/blueprint.schema.json",
+  "title": "AIPlayerStructureBlueprint",
+  "type": "object",
+  "required": ["id", "displayName", "width", "height", "depth", "requiredMaterials", "blocks"],
+  "properties": {
+    "id": {"type": "string", "enum": ["shelter", "compact_wood", "modern_house", "decorative_house", "small_farm", "watchtower"]},
+    "displayName": {"type": "string"},
+    "width": {"type": "integer", "minimum": 3},
+    "height": {"type": "integer", "minimum": 2},
+    "depth": {"type": "integer", "minimum": 3},
+    "requiredMaterials": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+    "blocks": {"type": "array", "items": {"type": "object", "required": ["dx", "dy", "dz", "blockId", "optional"], "properties": {"dx": {"type": "integer"}, "dy": {"type": "integer"}, "dz": {"type": "integer"}, "blockId": {"type": "string"}, "optional": {"type": "boolean"}}}}
+  }
+}

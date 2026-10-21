@@ -1,0 +1,12 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "AI Player Companion RP (v0.2.0)",
+    "description": "Humanoid model, skin texture, walk/idle/attack animations, and localization for AI Player.",
+    "uuid": "5e1c8a94-3d26-4f78-a901-2c4e6f8a0b1c",
+    "version": [0, 2, 0],
+    "min_engine_version": [1, 21, 0]
+  },
+  "modules": [{"description": "Companion client model, textures, and animations", "type": "resources", "uuid": "8a2f7b19-6c40-4e52-9d83-3b5c7d9e1f02", "version": [0, 2, 0]}],
+  "dependencies": [{"uuid": "7f3a9d12-4c8e-4b21-9e65-1a8f0c3d5e71", "version": [0, 2, 0]}]
+}

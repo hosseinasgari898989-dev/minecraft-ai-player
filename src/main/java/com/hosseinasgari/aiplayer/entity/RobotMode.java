@@ -2,16 +2,30 @@ package com.hosseinasgari.aiplayer.entity;
 
 public enum RobotMode {
     IDLE,
+    COMPANION,
     FOLLOW,
+    STAY,
     WANDER,
     EXPLORE,
     GUARD,
     PROTECT,
     PATROL,
     RETURN_HOME,
+    RETURN_OWNER,
     GATHER_WOOD,
     GATHER_STONE,
     GATHER_COAL,
+    MINE_ORES,
+    FIND_FOOD,
+    UPGRADE_TOOLS,
+    ORGANIZE_INVENTORY,
+    STORE_ITEMS,
+    PLANT_CROPS,
+    HARVEST_CROPS,
     BUILD_HOUSE,
-    BUILD_TOWER
+    BUILD_TOWER,
+    SCAN_THREATS,
+    FIND_PLAYER,
+    FOLLOW_PLAYER,
+    ENGAGE_PVP
 }

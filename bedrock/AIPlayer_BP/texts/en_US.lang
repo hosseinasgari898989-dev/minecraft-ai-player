@@ -1,0 +1,4 @@
+pack.name=AI Player Companion BP (Offline Brain v0.2.0)
+pack.description=100% offline rule-driven survival companion for Minecraft Bedrock Edition.
+entity.ai_player:companion.name=AI Player
+item.spawn_egg.entity.ai_player:companion.name=Spawn AI Player
