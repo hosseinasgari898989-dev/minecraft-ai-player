@@ -113,7 +113,7 @@ public final class AiPlayerMod implements ModInitializer {
         if (server == null || owner == null) return null;
         AiPlayerEntity first = null;
         for (ServerWorld world : server.getWorlds()) {
-            List<AiPlayerEntity> all = world.getEntitiesByType(ModEntities.AI_PLAYER, e -> owner.equals(e.getOwnerUuid()));
+            List<? extends AiPlayerEntity> all = world.getEntitiesByType(ModEntities.AI_PLAYER, e -> owner.equals(e.getOwnerUuid()));
             for (AiPlayerEntity entity : all) {
                 if (first == null) first = entity;
                 else entity.discard();
