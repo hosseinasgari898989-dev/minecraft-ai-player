@@ -11,6 +11,7 @@ import { findLocalPath } from "./brain/pathfinder.js";
 const ENTITY_ID = "ai_player:companion";
 const brains = new Map();
 const routes = new Map();
+const resourceTargetCache = new Map();
 const HOSTILES = ["monster", "undead", "arthropod", "illager"];
 
 function brainFor(entity) {
@@ -110,11 +111,14 @@ function moveToward(entity, target, speed = 0.23) {
 }
 function nearestBlock(dimension, origin, radius, predicate) {
   let best = null, bestDistance = Infinity;
+  const baseX = Math.floor(origin.x), baseY = Math.floor(origin.y), baseZ = Math.floor(origin.z);
+  // Keep the scan bounded; search is cached below so it does not run every brain tick.
   for (let dx = -radius; dx <= radius; dx++) {
-    for (let dy = -4; dy <= 6; dy++) {
+    for (let dy = -3; dy <= 4; dy++) {
       for (let dz = -radius; dz <= radius; dz++) {
-        const pos = { x: Math.floor(origin.x) + dx, y: Math.floor(origin.y) + dy, z: Math.floor(origin.z) + dz };
-        const block = dimension.getBlock(pos);
+        const pos = { x: baseX + dx, y: baseY + dy, z: baseZ + dz };
+        let block;
+        try { block = dimension.getBlock(pos); } catch { continue; }
         if (!block || !predicate(block.typeId)) continue;
         const distance = dx * dx + dy * dy + dz * dz;
         if (distance < bestDistance) { best = pos; bestDistance = distance; }
@@ -122,6 +126,21 @@ function nearestBlock(dimension, origin, radius, predicate) {
     }
   }
   return best;
+}
+
+function cachedNearestBlock(entity, resource, predicate) {
+  const cached = resourceTargetCache.get(entity.id);
+  if (cached && cached.resource === resource && system.currentTick - cached.tick < 40) {
+    if (!cached.pos) return null;
+    try {
+      const block = entity.dimension.getBlock(cached.pos);
+      if (block && predicate(block.typeId)) return cached.pos;
+    } catch { /* invalidated by an unloaded/changed target */ }
+    resourceTargetCache.delete(entity.id);
+  }
+  const pos = nearestBlock(entity.dimension, entity.location, 10, predicate);
+  resourceTargetCache.set(entity.id, { resource, tick: system.currentTick, pos });
+  return pos;
 }
 function snapshot(entity, owner) {
   const state = itemCounts(entity);
@@ -211,7 +230,7 @@ function runEntityTick(entity) {
       const requested = task.requiredResources?.[resource] ?? sub.targetCount;
       if ((snap.itemCounts[resource] ?? 0) >= requested) { sub.status = "COMPLETED"; break; }
       const matches = (id) => resource === "wood" ? id.endsWith("_log") : resource === "stone" ? ["minecraft:stone", "minecraft:cobblestone"].includes(id) : resource === "coal" ? id.includes("coal_ore") : id.includes("iron_ore");
-      const blockPos = nearestBlock(entity.dimension, entity.location, 14, matches);
+      const blockPos = cachedNearestBlock(entity, resource, matches);
       if (!blockPos) { task.status = "FAILED"; task.failureReason = "RESOURCE_UNAVAILABLE"; break; }
       if (Math.hypot(blockPos.x + 0.5 - entity.location.x, blockPos.z + 0.5 - entity.location.z) > 3.2) {
         const grid = {
@@ -229,7 +248,7 @@ function runEntityTick(entity) {
         const wp = nav.waypoints[nav.cursor] ?? blockPos;
         if (moveToward(entity, { x: wp.x + 0.5, y: wp.y, z: wp.z + 0.5 }) && nav.cursor < nav.waypoints.length - 1) nav.cursor++;
       } else {
-        try { entity.dimension.runCommandAsync(`setblock ${blockPos.x} ${blockPos.y} ${blockPos.z} air destroy`); } catch { /* report on the next snapshot if unavailable */ }
+        try { entity.dimension.runCommand(`setblock ${blockPos.x} ${blockPos.y} ${blockPos.z} air destroy`); } catch (error) { if (owner) say(owner, `Could not mine that block: ${error?.message ?? "command failed"}`); }
         routes.delete(entity.id);
       }
       break;
